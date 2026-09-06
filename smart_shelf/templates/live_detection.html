@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Live Detection{% endblock %}
+{% block page_title %}📷 Live Camera Detection{% endblock %}
+
+{% block content %}
+
+<div style="display:grid; grid-template-columns:1fr 380px; gap:20px;">
+
+    <!-- LEFT: Camera Feed -->
+    <div>
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-title">📹 Webcam Feed</div>
+
+            <!-- Status row -->
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:14px;">
+                <div id="cam-status-dot" style="width:10px; height:10px; border-radius:50%; background:#ef4444;"></div>
+                <span id="cam-status-text" style="font-size:0.85rem; color:#94a3b8;">Camera Stopped</span>
+                <span style="margin-left:auto; font-size:0.82rem; color:#94a3b8;">
+                    Mode: <strong id="detection-mode" style="color:#06b6d4;">—</strong>
+                </span>
+            </div>
+
+            <!-- Video Element -->
+            <div style="background:#0f172a; border-radius:10px; overflow:hidden; position:relative;">
+                <video id="webcam-video" autoplay muted playsinline
+                       style="width:100%; display:none; border-radius:10px;"></video>
+                <canvas id="overlay-canvas"
+                        style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+                <div id="cam-placeholder"
+                     style="height:300px; display:flex; flex-direction:column;
+                            align-items:center; justify-content:center; color:#334155;">
+                    <div style="font-size:4rem;">📷</div>
+                    <p style="margin-top:12px; font-size:0.9rem;">Click "Start Camera" to begin</p>
+                </div>
+            </div>
+
+            <!-- Hidden canvas for capture -->
+            <canvas id="capture-canvas" style="display:none;"></canvas>
+
+            <!-- Controls -->
+            <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+                <button class="btn btn-success" id="btn-start" onclick="startCamera()">
+                    ▶ Start Camera
+                </button>
+                <button class="btn btn-danger" id="btn-stop" onclick="stopCamera()" disabled>
+                    ⏹ Stop Camera
+                </button>
+                <button class="btn btn-primary" id="btn-detect" onclick="detectOnce()" disabled>
+                    🔍 Detect Now
+                </button>
+                <button class="btn btn-warning" onclick="runSimulation()">
+                    🎲 Simulate
+                </button>
+                <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; color:#94a3b8; cursor:pointer;">
+                    <input type="checkbox" id="auto-detect" style="width:auto;">
+                    Continuous Auto Detect
+                </label>
+            </div>
+        </div>
+
+        <!-- Detection Info Box -->
+        <div class="card">
+            <div class="card-title">🧠 Last Detection Result</div>
+            <div id="detection-result" style="font-size:0.88rem; color:#94a3b8; padding:8px 0;">
+                No detection run yet.
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT: Live Log -->
+    <div>
+        <div class="card" style="height:100%;">
+            <div class="card-title">
+                📋 Detection Log
+                <button onclick="clearLog()"
+                        style="float:right; background:transparent; border:none;
+                               color:#94a3b8; cursor:pointer; font-size:0.78rem;">
+                    Clear
+                </button>
+            </div>
+            <div id="detection-log"
+                 style="max-height:520px; overflow-y:auto; font-size:0.82rem;">
+                <div style="color:#94a3b8; padding:8px 0;">Waiting for detections...</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let videoStream = null;
+let isAutoDetectActive = false;
+let isDetectingBusy = false;
+
+async function startAutoDetectLoop() {
+    isAutoDetectActive = true;
+    while (isAutoDetectActive && videoStream) {
+        if (!isDetectingBusy) {
+            isDetectingBusy = true;
+            await detectOnce();
+            isDetectingBusy = false;
+        }
+        await new Promise(r => setTimeout(r, 200));
+    }
+}
+
+// ── Start Camera ────────────────────────────────────────────────────
+async function startCamera() {
+    try {
+        await fetch('/api/detect/reset', { method: 'POST' });
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.getElementById('webcam-video');
+        video.srcObject = videoStream;
+        video.style.display = 'block';
+        document.getElementById('cam-placeholder').style.display = 'none';
+        document.getElementById('cam-status-dot').style.background = '#10b981';
+        document.getElementById('cam-status-text').textContent = 'Camera Active';
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-stop').disabled  = false;
+        document.getElementById('btn-detect').disabled = false;
+
+        // Resize overlay canvas
+        video.addEventListener('loadedmetadata', () => {
+            const cv = document.getElementById('overlay-canvas');
+            cv.width = video.videoWidth;
+            cv.height = video.videoHeight;
+            cv.style.width  = '100%';
+            cv.style.height = '100%';
+        });
+
+        // Start auto-detect loop if checkbox is already checked
+        if (document.getElementById('auto-detect').checked) {
+            startAutoDetectLoop();
+        }
+
+        document.getElementById('detection-mode').textContent = 'Live Camera';
+    } catch (err) {
+        showToast('❌ Camera error: ' + err.message, 'danger');
+    }
+}
+
+// Auto-detect toggle
+document.getElementById('auto-detect').addEventListener('change', e => {
+    if (e.target.checked && videoStream) {
+        showToast('Continuous Auto-detect ON', 'info');
+        startAutoDetectLoop();
+    } else {
+        isAutoDetectActive = false;
+        if (e.target.checked) {
+            showToast('Start camera first to enable auto-detect', 'warning');
+            e.target.checked = false;
+        } else {
+            showToast('Auto-detect OFF', 'info');
+        }
+    }
+});
+
+// ── Stop Camera ─────────────────────────────────────────────────────
+function stopCamera() {
+    isAutoDetectActive = false;
+    if (videoStream) {
+        videoStream.getTracks().forEach(t => t.stop());
+        videoStream = null;
+    }
+    fetch('/api/detect/reset', { method: 'POST' });
+    document.getElementById('webcam-video').style.display = 'none';
+    document.getElementById('cam-placeholder').style.display = 'flex';
+    document.getElementById('cam-status-dot').style.background = '#ef4444';
+    document.getElementById('cam-status-text').textContent = 'Camera Stopped';
+    document.getElementById('btn-start').disabled  = false;
+    document.getElementById('btn-stop').disabled   = true;
+    document.getElementById('btn-detect').disabled = true;
+    document.getElementById('auto-detect').checked = false;
+    document.getElementById('detection-mode').textContent = '—';
+}
+
+// ── Single Detection (Optimized capture size) ───────────────────────
+async function detectOnce() {
+    const video   = document.getElementById('webcam-video');
+    const canvas  = document.getElementById('capture-canvas');
+    
+    // Scale max width to 640 for fast transfer & inference
+    const maxW = 640;
+    const vW = video.videoWidth || 640;
+    const vH = video.videoHeight || 480;
+    const scale = Math.min(1, maxW / vW);
+    
+    canvas.width  = Math.round(vW * scale);
+    canvas.height = Math.round(vH * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    const image   = canvas.toDataURL('image/jpeg', 0.6);
+
+    try {
+        const resp = await fetch('/api/detect/frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image })
+        });
+        const data = await resp.json();
+        handleDetectionResult(data);
+    } catch (err) {
+        showToast('Detection error: ' + err.message, 'danger');
+    }
+}
+
+// ── Simulate ─────────────────────────────────────────────────────────
+async function runSimulation() {
+    document.getElementById('detection-mode').textContent = 'Simulation';
+    try {
+        const resp = await fetch('/api/detect/simulate', { method: 'POST' });
+        const data = await resp.json();
+        handleDetectionResult(data);
+    } catch (err) {
+        showToast('Simulation error: ' + err.message, 'danger');
+    }
+}
+
+// ── Web Audio Sound Effects ─────────────────────────────────────────
+let audioCtx = null;
+let soundEnabled = true;
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playTone(freq, type, duration) {
+    if (!soundEnabled) return;
+    try {
+        initAudio();
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {}
+}
+
+function playSound(eventType) {
+    if (eventType === 'addition') {
+        playTone(600, 'sine', 0.12);
+        setTimeout(() => playTone(900, 'sine', 0.18), 100);
+    } else if (eventType === 'removal') {
+        playTone(380, 'triangle', 0.22);
+    } else if (eventType === 'alert') {
+        playTone(850, 'sawtooth', 0.15);
+        setTimeout(() => playTone(850, 'sawtooth', 0.15), 150);
+    }
+}
+
+// ── Draw Bounding Boxes on Overlay Canvas ───────────────────────────
+function drawBoundingBoxes(raw_detections) {
+    const video   = document.getElementById('webcam-video');
+    const overlay = document.getElementById('overlay-canvas');
+    if (!overlay) return;
+
+    const ctx = overlay.getContext('2d');
+    overlay.width  = video.videoWidth  || overlay.clientWidth  || 640;
+    overlay.height = video.videoHeight || overlay.clientHeight || 480;
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    if (!raw_detections || raw_detections.length === 0) return;
+
+    const scaleX = overlay.width / Math.min(640, video.videoWidth || 640);
+    const scaleY = overlay.height / Math.min(480, video.videoHeight || 480);
+
+    for (const item of raw_detections) {
+        if (!item.box || item.box.length < 4) continue;
+        const [bx1, by1, bx2, by2] = item.box;
+        const x1 = bx1 * scaleX;
+        const y1 = by1 * scaleY;
+        const x2 = bx2 * scaleX;
+        const y2 = by2 * scaleY;
+        const color = item.category === 'person' ? '#06b6d4' : '#10b981';
+
+        // Glowing Bounding Box Frame
+        ctx.lineWidth   = 3;
+        ctx.strokeStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur  = 10;
+        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        ctx.shadowBlur  = 0;
+
+        // Label Badge
+        const labelText = `${item.label} (${Math.round((item.confidence || 0.9) * 100)}%)`;
+        ctx.font = 'bold 13px Inter, sans-serif';
+        const txtW = ctx.measureText(labelText).width;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x1, Math.max(0, y1 - 22), txtW + 12, 22);
+
+        ctx.fillStyle = '#0f172a';
+        ctx.fillText(labelText, x1 + 6, Math.max(15, y1 - 6));
+    }
+}
+
+// ── Handle Detection Results ─────────────────────────────────────────
+function handleDetectionResult(data) {
+    const result = document.getElementById('detection-result');
+
+    // Draw live bounding boxes on overlay canvas
+    if (data.raw_detections) {
+        drawBoundingBoxes(data.raw_detections);
+    }
+
+    if (!data.detected || data.detected.length === 0) {
+        if (data.current_items && data.current_items.length > 0) {
+            result.innerHTML = `<span style="color:#10b981;">🟢 Object(s) in frame: <strong>${data.current_items.join(', ')}</strong> (Stable / Unchanged)</span>`;
+        } else {
+            result.innerHTML = '<span style="color:#94a3b8;">🟢 No objects currently in frame.</span>';
+        }
+        return;
+    }
+
+    let html = '';
+    for (const item of data.detected) {
+        if (item.type === 'addition') {
+            playSound('addition');
+            html += `<div style="color:#10b981;">➕ <strong>${item.product}</strong> entered frame (+${item.quantity})
+                     | stock now: <strong>${item.stock ?? '?'}</strong></div>`;
+            appendLog(item);
+        } else if (item.type === 'removal') {
+            playSound('removal');
+            html += `<div style="color:#f59e0b;">📦 <strong>${item.product}</strong> removed from frame (-${item.quantity})
+                     | stock now: <strong style="color:#f59e0b">${item.stock ?? '?'}</strong></div>`;
+            appendLog(item);
+        } else if (item.type === 'person') {
+            html += `<div>👤 <strong>Person detected</strong> near shelf</div>`;
+            appendLog(item);
+        } else {
+            html += `<div>🔍 <strong>${item.label || item.product}</strong> seen</div>`;
+            appendLog(item);
+        }
+    }
+    result.innerHTML = html;
+}
+
+// ── Append to log ────────────────────────────────────────────────────
+function appendLog(item) {
+    const log  = document.getElementById('detection-log');
+    const div  = document.createElement('div');
+    const now  = new Date().toLocaleTimeString();
+    const isOk = item.type === 'none';
+    div.style.cssText = `
+        padding:8px 0; border-bottom:1px solid #334155;
+        color:${isOk ? '#94a3b8' : '#f1f5f9'};
+        animation:fadeIn 0.3s ease;
+    `;
+    if (item.type === 'addition') {
+        div.innerHTML = `<span style="color:#10b981;">⬆ ADDED</span>
+            <strong>${item.product}</strong> ×${item.quantity}
+            → stock: ${item.stock ?? '?'}
+            <span style="float:right;color:#94a3b8;">${now}</span>`;
+    } else if (item.type === 'removal') {
+        div.innerHTML = `<span style="color:#f59e0b;">⬇ REMOVED</span>
+            <strong>${item.product}</strong> ×${item.quantity}
+            → stock: ${item.stock ?? '?'}
+            <span style="float:right;color:#94a3b8;">${now}</span>`;
+    } else if (item.type === 'person') {
+        div.innerHTML = `<span style="color:#06b6d4;">👤</span> Person detected
+            <span style="float:right;color:#94a3b8;">${now}</span>`;
+    } else {
+        div.innerHTML = `<span style="color:#94a3b8;">—</span> ${item.message || item.label || 'No change'}
+            <span style="float:right;color:#94a3b8;">${now}</span>`;
+    }
+    log.insertBefore(div, log.firstChild);
+    while (log.children.length > 50) log.removeChild(log.lastChild);
+}
+
+function clearLog() {
+    document.getElementById('detection-log').innerHTML =
+        '<div style="color:#94a3b8; padding:8px 0;">Log cleared.</div>';
+}
+
+// ── SocketIO real-time ───────────────────────────────────────────────
+socket.on('inventory_update', data => {
+    appendLog(data);
+    if (data.type) playSound(data.type);
+});
+socket.on('alert', data => {
+    appendLog({ type: 'alert', message: '⚠️ ' + data.message });
+    playSound('alert');
+});
+</script>
+{% endblock %}

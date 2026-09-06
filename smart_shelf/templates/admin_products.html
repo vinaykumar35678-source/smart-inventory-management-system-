@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Manage Products{% endblock %}
+{% block page_title %}🛒 Product Management{% endblock %}
+
+{% block content %}
+
+<!-- Add Product Button -->
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <span style="color:#94a3b8; font-size:0.88rem;">{{ products|length }} products in database</span>
+    <button class="btn btn-primary" onclick="document.getElementById('add-modal').classList.add('open')">
+        ➕ Add New Product
+    </button>
+</div>
+
+<!-- Products Table -->
+<div class="card" style="padding:0; overflow:hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th style="padding:14px 16px;">Product</th>
+                <th>Category</th>
+                <th>Stock</th>
+                <th>Threshold</th>
+                <th>Price (Rs)</th>
+                <th>Status</th>
+                <th style="text-align:right; padding-right:16px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr>
+                <td style="padding:12px 16px;">
+                    <span style="font-size:1.1rem;">{{ p.image_url }}</span>
+                    <strong style="margin-left:6px;">{{ p.name }}</strong>
+                </td>
+                <td><span class="badge badge-info">{{ p.category }}</span></td>
+                <td>
+                    <strong style="color:{% if p.stock == 0 %}#ef4444{% elif p.stock <= p.threshold %}#f59e0b{% else %}#10b981{% endif %};">
+                        {{ p.stock }}
+                    </strong>
+                </td>
+                <td style="color:#94a3b8;">{{ p.threshold }}</td>
+                <td>Rs {{ "%.2f"|format(p.price) }}</td>
+                <td>
+                    {% if p.stock == 0 %}
+                    <span class="badge badge-danger">Out of Stock</span>
+                    {% elif p.stock <= p.threshold %}
+                    <span class="badge badge-warning">Low Stock</span>
+                    {% else %}
+                    <span class="badge badge-success">In Stock</span>
+                    {% endif %}
+                </td>
+                <td style="text-align:right; padding-right:16px;">
+                    <button class="btn btn-outline btn-sm"
+                        onclick="openEditModal({{ p.id }}, {{ p.name|tojson }}, {{ p.stock }},
+                                              {{ p.threshold }}, {{ p.price }}, {{ p.category|tojson }})">
+                        ✏️ Edit
+                    </button>
+                    <form method="POST"
+                          action="{{ url_for('delete_product', product_id=p.id) }}"
+                          style="display:inline;"
+                          onsubmit="return confirm('Delete ' + {{ p.name|tojson }} + '?')">
+                        <button type="submit" class="btn btn-danger btn-sm">🗑 Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align:center; padding:32px; color:#94a3b8;">
+                    No products yet.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ── ADD MODAL ────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="add-modal">
+    <div class="modal">
+        <div class="modal-title">➕ Add New Product</div>
+        <form method="POST" action="{{ url_for('add_product') }}">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Product Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. Apple">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category">
+                        <option>Fruits</option>
+                        <option>Vegetables</option>
+                        <option>Dairy</option>
+                        <option>Food</option>
+                        <option>Beverages</option>
+                        <option>Electronics</option>
+                        <option>Stationery</option>
+                        <option>General</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Emoji / Image URL</label>
+                    <input type="text" name="image_url" placeholder="🍎">
+                </div>
+                <div class="form-group">
+                    <label>Initial Stock</label>
+                    <input type="number" name="stock" value="10" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Low Stock Threshold</label>
+                    <input type="number" name="threshold" value="5" min="1" required>
+                </div>
+                <div class="form-group" style="grid-column:1/-1;">
+                    <label>Price (Rs)</label>
+                    <input type="number" name="price" value="0" min="0" step="0.01" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline"
+                    onclick="document.getElementById('add-modal').classList.remove('open')">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">Add Product</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── EDIT MODAL ───────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal">
+        <div class="modal-title">✏️ Edit Product: <span id="edit-product-name"></span></div>
+        <form method="POST" id="edit-form" action="">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div class="form-group">
+                    <label>Stock</label>
+                    <input type="number" name="stock" id="edit-stock" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Low Stock Threshold</label>
+                    <input type="number" name="threshold" id="edit-threshold" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Price (Rs)</label>
+                    <input type="number" name="price" id="edit-price" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category" id="edit-category">
+                        <option>Fruits</option>
+                        <option>Vegetables</option>
+                        <option>Dairy</option>
+                        <option>Food</option>
+                        <option>Beverages</option>
+                        <option>Electronics</option>
+                        <option>Stationery</option>
+                        <option>General</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline"
+                    onclick="document.getElementById('edit-modal').classList.remove('open')">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function openEditModal(id, name, stock, threshold, price, category) {
+    document.getElementById('edit-product-name').textContent = name;
+    document.getElementById('edit-stock').value     = stock;
+    document.getElementById('edit-threshold').value = threshold;
+    document.getElementById('edit-price').value     = price;
+    document.getElementById('edit-category').value  = category;
+    document.getElementById('edit-form').action = `/admin/products/edit/${id}`;
+    document.getElementById('edit-modal').classList.add('open');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.classList.remove('open');
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Smart Shelf{% endblock %} | Inventory Vision System</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Socket.IO -->
+    <script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
+    <style>
+        /* ── RESET & BASE ─────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --primary:   #6366f1;
+            --primary-d: #4f46e5;
+            --accent:    #06b6d4;
+            --success:   #10b981;
+            --warning:   #f59e0b;
+            --danger:    #f43f5e;
+            --bg:        #0f172a;
+            --glass-bg:  rgba(30, 41, 59, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            --text:      #f8fafc;
+            --text-muted:#94a3b8;
+            --radius:    16px;
+            --sidebar-w: 260px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(120deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            background-size: 200% 200%;
+            animation: gradientMove 15s ease infinite;
+            color: var(--text);
+            display: flex;
+            min-height: 100vh;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        h1, h2, h3, h4, h5, .topbar-title, .stat-value, .modal-title {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* ── SIDEBAR ──────────────────────────────────────────── */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 100;
+            box-shadow: var(--glass-shadow);
+        }
+        .sidebar-logo {
+            padding: 30px 20px 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .sidebar-logo h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #6366f1, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+        .sidebar-logo p { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+        .sidebar-nav { padding: 20px 16px; flex: 1; overflow-y: auto; }
+        .nav-section { font-size: 0.7rem; font-weight: 600; color: rgba(255,255,255,0.4);
+                       text-transform: uppercase; letter-spacing: 1.5px;
+                       padding: 12px 8px 8px; }
+        .nav-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-bottom: 4px;
+        }
+        .nav-item:hover { 
+            background: rgba(255,255,255,0.08); 
+            color: var(--text);
+            transform: translateX(4px);
+        }
+        .nav-item.active { 
+            background: linear-gradient(135deg, var(--primary), var(--accent)); 
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+        .nav-item .icon { font-size: 1.2rem; width: 24px; text-align: center; }
+
+        /* ── MAIN CONTENT ─────────────────────────────────────── */
+        .main {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .topbar {
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 90;
+        }
+        .topbar-title { font-size: 1.3rem; font-weight: 600; letter-spacing: -0.5px; }
+        .topbar-user {
+            display: flex; align-items: center; gap: 12px;
+            font-size: 0.9rem; color: var(--text);
+        }
+        .user-badge {
+            background: linear-gradient(135deg, #f43f5e, #f59e0b);
+            color: #fff;
+            border-radius: 50%;
+            width: 36px; height: 36px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 1rem;
+            box-shadow: 0 2px 10px rgba(244, 63, 94, 0.4);
+        }
+
+        .page-content { padding: 32px; flex: 1; }
+
+        /* ── FLASH MESSAGES ──────────────────────────────────── */
+        .flash-container { padding: 0 32px; margin-top: 20px; }
+        .flash {
+            padding: 14px 20px; border-radius: 12px;
+            font-size: 0.9rem; margin-bottom: 12px;
+            display: flex; align-items: center; gap: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .flash.success { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #a7f3d0; }
+        .flash.danger  { background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3);  color: #fecdd3; }
+        .flash.warning { background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fde68a; }
+        .flash.info    { background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3);  color: #cffafe; }
+
+        /* ── CARDS ────────────────────────────────────────────── */
+        .card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+        }
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 16px;
+        }
+
+        /* ── STAT CARDS ───────────────────────────────────────── */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 32px; }
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 24px;
+            display: flex; align-items: center; gap: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-icon {
+            font-size: 2rem; width: 60px; height: 60px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.05);
+            box-shadow: inset 0 2px 4px rgba(255,255,255,0.1);
+        }
+        .stat-value { font-size: 2.2rem; font-weight: 700; line-height: 1; color: #fff; }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; }
+        .stat-danger  .stat-icon { background: linear-gradient(135deg, rgba(244,63,94,0.2), rgba(244,63,94,0.05)); color: #f43f5e; }
+        .stat-success .stat-icon { background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.05)); color: #10b981; }
+        .stat-warning .stat-icon { background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05)); color: #f59e0b; }
+        .stat-info    .stat-icon { background: linear-gradient(135deg, rgba(6,182,212,0.2), rgba(6,182,212,0.05)); color: #06b6d4; }
+
+        /* ── TABLES ───────────────────────────────────────────── */
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
+        th {
+            text-align: left; padding: 14px 16px;
+            font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+            color: rgba(255,255,255,0.5); letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: rgba(0,0,0,0.2);
+        }
+        td { padding: 16px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; }
+        tr { transition: background 0.2s ease; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.05); }
+
+        /* ── BADGES ───────────────────────────────────────────── */
+        .badge {
+            display: inline-block; padding: 4px 12px;
+            border-radius: 99px; font-size: 0.75rem; font-weight: 600;
+            backdrop-filter: blur(4px);
+        }
+        .badge-success { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+        .badge-danger  { background: rgba(244,63,94,0.2); color: #fca5a5; border: 1px solid rgba(244,63,94,0.3); }
+        .badge-warning { background: rgba(245,158,11,0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+        .badge-info    { background: rgba(6,182,212,0.2); color: #67e8f9; border: 1px solid rgba(6,182,212,0.3); }
+        .badge-gray    { background: rgba(255,255,255,0.1); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.1); }
+
+        /* ── STOCK BAR ────────────────────────────────────────── */
+        .stock-bar { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.1); overflow: hidden; margin-top: 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3); }
+        .stock-fill { height: 100%; border-radius: 99px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(90deg, var(--primary), var(--accent)); }
+
+        /* ── BUTTONS ──────────────────────────────────────────── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; border-radius: 10px;
+            font-size: 0.9rem; font-weight: 600;
+            border: none; cursor: pointer;
+            text-decoration: none; transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        .btn-primary  { background: linear-gradient(135deg, var(--primary), #818cf8); color: #fff; box-shadow: 0 4px 12px rgba(99,102,241,0.4); }
+        .btn-primary:hover  { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(99,102,241,0.6); }
+        .btn-danger   { background: linear-gradient(135deg, var(--danger), #fb7185); color: #fff; box-shadow: 0 4px 12px rgba(244,63,94,0.4); }
+        .btn-danger:hover   { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(244,63,94,0.6); }
+        .btn-success  { background: linear-gradient(135deg, var(--success), #34d399); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.4); }
+        .btn-success:hover  { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,185,129,0.6); }
+        .btn-warning  { background: linear-gradient(135deg, var(--warning), #fbbf24); color: #000; box-shadow: 0 4px 12px rgba(245,158,11,0.4); }
+        .btn-warning:hover  { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(245,158,11,0.6); }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; border-radius: 8px; }
+        .btn-outline {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--text);
+            backdrop-filter: blur(4px);
+        }
+        .btn-outline:hover { background: rgba(255,255,255,0.15); transform: translateY(-2px); }
+
+        /* ── FORM ─────────────────────────────────────────────── */
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px 16px;
+            background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.15);
+            color: #fff; border-radius: 10px;
+            font-family: inherit; font-size: 0.95rem;
+            outline: none; transition: all 0.3s ease;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.3), inset 0 2px 4px rgba(0,0,0,0.1);
+            background: rgba(0,0,0,0.3);
+        }
+
+        /* ── MODAL ────────────────────────────────────────────── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(15, 23, 42, 0.8); z-index: 500;
+            align-items: center; justify-content: center;
+            backdrop-filter: blur(8px);
+        }
+        .modal-overlay.open { display: flex; animation: modalFadeIn 0.3s ease; }
+        @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal {
+            background: var(--glass-bg); border: 1px solid var(--glass-border);
+            border-radius: 16px; padding: 32px; width: 480px;
+            max-width: 95vw; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            transform: translateY(0); animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes modalSlideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-title { margin-bottom: 24px; }
+        .modal-footer { display: flex; gap: 12px; justify-content: flex-end; margin-top: 28px; }
+
+        /* ── LIVE FEED ────────────────────────────────────────── */
+        #activity-feed { max-height: 360px; overflow-y: auto; padding-right: 8px; }
+        #activity-feed::-webkit-scrollbar { width: 6px; }
+        #activity-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        .feed-item {
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 14px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9rem; animation: feedSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .feed-item:last-child { border-bottom: none; }
+        .feed-icon { font-size: 1.4rem; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+        .feed-text { flex: 1; margin-top: 2px; }
+        .feed-time { font-size: 0.8rem; color: var(--text-muted); display: block; margin-top: 4px; }
+        @keyframes feedSlideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* ── SIDEBAR USER ─────────────────────────────────────── */
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1);
+        }
+        .sidebar-footer a {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 14px; border-radius: 10px;
+            color: var(--text-muted); text-decoration: none;
+            font-size: 0.9rem; font-weight: 500; transition: all 0.3s ease;
+        }
+        .sidebar-footer a:hover { background: rgba(244,63,94,0.15); color: #f43f5e; }
+
+        /* ── WS INDICATOR ─────────────────────────────────────── */
+        .ws-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: inline-block;
+            box-shadow: 0 0 0 0 rgba(16,185,129,0);
+        }
+        .ws-dot.connected { 
+            background: var(--success); 
+            animation: pulse-green 2s infinite;
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* ── RESPONSIVE ───────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+{% if session.user %}
+<!-- SIDEBAR -->
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <h1>📦 Smart Shelf</h1>
+        <p>Academic Student Project</p>
+        <p>Inventory Vision System</p>
+    </div>
+    <div class="sidebar-nav">
+        <div class="nav-section">Main</div>
+        <a href="{{ url_for('dashboard') }}"
+           class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+            <span class="icon">🏠</span> Dashboard
+        </a>
+        <a href="{{ url_for('inventory') }}"
+           class="nav-item {% if request.endpoint == 'inventory' %}active{% endif %}">
+            <span class="icon">📦</span> Inventory
+        </a>
+        <a href="{{ url_for('live_detection') }}"
+           class="nav-item {% if request.endpoint == 'live_detection' %}active{% endif %}">
+            <span class="icon">📷</span> Live Detection
+        </a>
+        <a href="{{ url_for('alerts') }}"
+           class="nav-item {% if request.endpoint == 'alerts' %}active{% endif %}">
+            <span class="icon">🔔</span> Alerts
+        </a>
+        <a href="{{ url_for('events') }}"
+           class="nav-item {% if request.endpoint == 'events' %}active{% endif %}">
+            <span class="icon">📋</span> Events Log
+        </a>
+        {% if session.role == 'admin' %}
+        <div class="nav-section">Admin</div>
+        <a href="{{ url_for('admin_products') }}"
+           class="nav-item {% if request.endpoint == 'admin_products' %}active{% endif %}">
+            <span class="icon">🛒</span> Products
+        </a>
+        <a href="{{ url_for('admin_users') }}"
+           class="nav-item {% if request.endpoint == 'admin_users' %}active{% endif %}">
+            <span class="icon">👥</span> Users
+        </a>
+        <a href="{{ url_for('export_excel') }}" class="nav-item">
+            <span class="icon">📊</span> Export Excel
+        </a>
+        {% endif %}
+    </div>
+    <div class="sidebar-footer">
+        <a href="{{ url_for('logout') }}">
+            <span>🚪</span> Logout ({{ session.user }})
+        </a>
+    </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+    <div class="topbar">
+        <span class="topbar-title">{% block page_title %}Smart Shelf{% endblock %}</span>
+        <div class="topbar-user">
+            <span class="ws-dot" id="ws-dot" title="WebSocket status"></span>
+            <span>{{ session.full_name }}</span>
+            <span class="badge {% if session.role == 'admin' %}badge-warning{% else %}badge-info{% endif %}">
+                {{ session.role }}
+            </span>
+            <div class="user-badge">{{ session.full_name[0]|upper }}</div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">
+            {% if category == 'success' %}✅{% elif category == 'danger' %}❌{% elif category == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <div class="page-content">
+        {% block content %}{% endblock %}
+    </div>
+</div>
+{% else %}
+<div style="flex:1">{% block auth_content %}{% endblock %}</div>
+{% endif %}
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container" style="
+    position: fixed; bottom: 20px; right: 20px;
+    display: flex; flex-direction: column-reverse; gap: 8px;
+    z-index: 9999;
+"></div>
+
+<script>
+// ── WebSocket / SocketIO connection ─────────────────────────────────
+const socket = io();
+const dot    = document.getElementById('ws-dot');
+
+socket.on('connect', () => {
+    if (dot) dot.classList.add('connected');
+});
+socket.on('disconnect', () => {
+    if (dot) dot.classList.remove('connected');
+});
+
+// ── Toast helper ────────────────────────────────────────────────────
+function showToast(msg, type = 'info', duration = 4000) {
+    const colors = {
+        success: '#10b981', danger: '#ef4444',
+        warning: '#f59e0b', info: '#06b6d4'
+    };
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        background:#1e293b; border:1px solid ${colors[type] || colors.info};
+        color:#f1f5f9; padding:12px 16px; border-radius:10px;
+        font-size:0.85rem; max-width:320px; box-shadow:0 4px 16px rgba(0,0,0,0.4);
+        animation:fadeIn 0.3s ease;
+    `;
+    toast.textContent = msg;
+    document.getElementById('toast-container').appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+}
+
+// ── Live event handlers ─────────────────────────────────────────────
+socket.on('inventory_update', data => {
+    if (data.type === 'addition') {
+        showToast(`➕ ${data.product} added — stock: ${data.stock ?? '?'}`, 'success');
+    } else {
+        showToast(`📦 ${data.product} removed — stock: ${data.stock ?? '?'}`, 'info');
+    }
+    // Refresh stock display if on inventory page
+    if (typeof updateStockDisplay === 'function') updateStockDisplay(data);
+});
+socket.on('alert', data => {
+    showToast(`⚠️ ${data.message}`, 'warning', 6000);
+});
+socket.on('person_detected', data => {
+    showToast(`👤 ${data.message}`, 'info', 3000);
+});
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

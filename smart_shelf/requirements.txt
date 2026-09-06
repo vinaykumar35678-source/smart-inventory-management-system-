@@ -1,0 +1,17 @@
+# Smart Shelf Inventory Vision System
+# Python-only requirements
+
+flask
+flask-socketio
+sqlalchemy
+bcrypt
+opencv-python
+ultralytics
+pandas
+openpyxl
+numpy
+streamlit
+plotly
+pillow
+pyyaml
+lapx

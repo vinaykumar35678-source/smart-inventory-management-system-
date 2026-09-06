@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Events Log{% endblock %}
+{% block page_title %}📋 Detection Events Log{% endblock %}
+
+{% block content %}
+
+<div style="display:flex; gap:12px; margin-bottom:20px; align-items:center;">
+    <input type="text" id="event-search" placeholder="🔍 Search by product..." style="background:#1e293b; border:1px solid #334155; color:#f1f5f9;
+                  padding:9px 14px; border-radius:8px; font-size:0.88rem;
+                  font-family:inherit; outline:none; width:220px;">
+    <span style="margin-left:auto; color:#94a3b8; font-size:0.85rem;">
+        Showing last {{ events|length }} events
+    </span>
+</div>
+
+{% if events %}
+<div class="card" style="padding:0; overflow:hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th style="padding:14px 16px;">#</th>
+                <th>Product</th>
+                <th>Qty Removed</th>
+                <th>Confidence</th>
+                <th>Detection Method</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody id="events-body">
+            {% for ev in events %}
+            <tr class="event-row" data-product="{{ ev.product_name|lower }}">
+                <td style="padding:12px 16px; color:#94a3b8;">{{ ev.id }}</td>
+                <td><strong>{{ ev.product_name }}</strong></td>
+                <td>
+                    <span class="badge badge-info">
+                        {{ ev.quantity_removed }} unit{{ 's' if ev.quantity_removed != 1 else '' }}
+                    </span>
+                </td>
+                <td>
+                    {% set conf_pct = (ev.confidence * 100)|int %}
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="stock-bar" style="width:60px;">
+                            <div class="stock-fill" style="
+                                width:{{ conf_pct }}%;
+                                background:{% if conf_pct >= 80 %}#10b981
+                                           {% elif conf_pct >= 60 %}#f59e0b
+                                           {% else %}#ef4444{% endif %};"></div>
+                        </div>
+                        <span style="font-size:0.8rem; color:#94a3b8;">{{ conf_pct }}%</span>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge badge-gray">
+                        {% if ev.confidence >= 0.85 %}YOLO11{% else %}Simulation{% endif %}
+                    </span>
+                </td>
+                <td style="color:#94a3b8; font-size:0.82rem;">
+                    {{ ev.timestamp.strftime('%d %b %Y %H:%M:%S') }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+    <div style="font-size:3rem; margin-bottom:12px;">📋</div>
+    <div style="font-size:1.1rem; font-weight:600;">No events recorded yet</div>
+    <div style="color:#94a3b8; font-size:0.88rem; margin-top:6px;">
+        Run a simulation or use the live camera to generate detection events.
+    </div>
+    <a href="{{ url_for('live_detection') }}" class="btn btn-primary" style="margin-top:16px;">
+        📷 Open Live Detection
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.getElementById('event-search').addEventListener('input', function () {
+        const val = this.value.toLowerCase();
+        document.querySelectorAll('.event-row').forEach(row => {
+            row.style.display = row.dataset.product.includes(val) ? '' : 'none';
+        });
+    });
+</script>
+{% endblock %}

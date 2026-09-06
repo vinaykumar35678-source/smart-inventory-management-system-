@@ -1,0 +1,23 @@
+# Dataset configuration for YOLO11 Smart Shelf
+path: ./dataset
+train: images/train
+val: images/train
+
+# Number of product classes
+nc: 13
+
+# Class labels
+names:
+  0: Apple
+  1: Banana
+  2: Milk
+  3: Water Bottle
+  4: Bread
+  5: Lays
+  6: Biscuits
+  7: Mobile
+  8: Chair
+  9: Table
+  10: Book
+  11: Pen
+  12: ID Card

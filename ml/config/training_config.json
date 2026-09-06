@@ -1,0 +1,14 @@
+{
+  "model_type": "yolo11n.pt",
+  "available_models": ["yolo11n.pt", "yolo11s.pt", "yolov8n.pt", "yolov8s.pt", "yolov8m.pt"],
+  "epochs": 20,
+  "batch_size": 8,
+  "image_size": 640,
+  "device": "auto",
+  "confidence": 0.45,
+  "iou_threshold": 0.45,
+  "optimizer": "auto",
+  "lr0": 0.01,
+  "patience": 10,
+  "save_period": 5
+}

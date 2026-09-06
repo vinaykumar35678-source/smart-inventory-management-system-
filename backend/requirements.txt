@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+opencv-python
+ultralytics
+pandas
+openpyxl
+websockets
+python-multipart
+aiofiles
+twilio
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]

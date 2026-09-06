@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block auth_content %}
+<style>
+    body {
+        /* Override base background for login page to add extra elements */
+        background: radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.25), transparent 25%),
+                    radial-gradient(circle at 85% 30%, rgba(6, 182, 212, 0.2), transparent 25%),
+                    var(--bg);
+        overflow: hidden;
+    }
+    
+    .floating-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(60px);
+        opacity: 0.5;
+        animation: floatOrb 10s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 0;
+    }
+    .orb-1 {
+        width: 300px; height: 300px;
+        background: var(--primary);
+        top: -10%; left: 20%;
+        animation-delay: 0s;
+    }
+    .orb-2 {
+        width: 400px; height: 400px;
+        background: var(--accent);
+        bottom: -20%; right: 10%;
+        animation-delay: -3s;
+    }
+    .orb-3 {
+        width: 250px; height: 250px;
+        background: var(--danger);
+        top: 40%; left: -10%;
+        animation-delay: -7s;
+    }
+
+    @keyframes floatOrb {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(30px, -50px) scale(1.1); }
+    }
+
+    .login-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        z-index: 10;
+    }
+    
+    .login-box {
+        background: rgba(30, 41, 59, 0.7);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 24px;
+        padding: 48px;
+        width: 420px;
+        max-width: 90vw;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUpFade {
+        from { opacity: 0; transform: translateY(40px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .login-logo {
+        text-align: center;
+        margin-bottom: 36px;
+    }
+    .login-logo .emoji { 
+        font-size: 3.5rem; 
+        margin-bottom: 12px;
+        filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    }
+    .login-logo h1 {
+        font-size: 1.8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #fff 0%, #cbd5e1 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 4px;
+    }
+    .login-logo p { 
+        font-size: 0.9rem; 
+        color: var(--text-muted); 
+    }
+
+    .login-btn {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: #fff;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.05rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-family: 'Outfit', sans-serif;
+        margin-top: 12px;
+        box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+    }
+    .login-btn:hover { 
+        transform: translateY(-2px);
+        box-shadow: 0 12px 28px rgba(99, 102, 241, 0.5);
+    }
+    .login-btn:active {
+        transform: translateY(1px);
+    }
+
+    .login-hint {
+        margin-top: 24px;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        font-size: 0.85rem;
+        color: #94a3b8;
+    }
+    .login-hint p { margin-bottom: 6px; }
+    .login-hint p:last-child { margin-bottom: 0; }
+    .login-hint strong { color: #e2e8f0; }
+
+</style>
+
+<!-- Background Orbs -->
+<div class="floating-orb orb-1"></div>
+<div class="floating-orb orb-2"></div>
+<div class="floating-orb orb-3"></div>
+
+<div class="login-page">
+    <div class="login-box">
+        <div class="login-logo">
+            <div class="emoji">📦</div>
+            <h1>Smart Shelf</h1>
+            <p>Inventory Vision System</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+        <div class="flash {{ cat }}" style="margin-bottom: 24px; margin-top: 0;">
+            {% if cat == 'success' %}✅{% elif cat == 'danger' %}❌{% elif cat == 'warning' %}⚠️{% else %}ℹ️{% endif %}
+            {{ msg }}
+        </div>
+        {% endfor %}
+        {% endwith %}
+
+        <form method="POST" class="login-form" id="login-form">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username"
+                       placeholder="Enter your username"
+                       required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password"
+                       placeholder="Enter your password"
+                       required autocomplete="current-password">
+            </div>
+            <button type="submit" class="login-btn" id="login-btn">Secure Login</button>
+        </form>
+
+        <div class="login-hint">
+            <p>🔑 <strong>Admin:</strong> admin / Admin@123</p>
+            <p>👤 <strong>Staff:</strong> staff / Staff@123</p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('login-form').addEventListener('submit', function() {
+    document.getElementById('login-btn').textContent = 'Authenticating...';
+    document.getElementById('login-btn').style.opacity = '0.8';
+});
+</script>
+{% endblock %}

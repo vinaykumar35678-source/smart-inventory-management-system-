@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}📊 Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<!-- STAT CARDS -->
+<div class="stats-grid">
+    <div class="stat-card stat-info">
+        <div class="stat-icon">📦</div>
+        <div>
+            <div class="stat-value" id="stat-total">{{ total_products }}</div>
+            <div class="stat-label">Total Products</div>
+        </div>
+    </div>
+    <div class="stat-card stat-danger">
+        <div class="stat-icon">⚠️</div>
+        <div>
+            <div class="stat-value" id="stat-low">{{ low_stock }}</div>
+            <div class="stat-label">Low Stock Items</div>
+        </div>
+    </div>
+    <div class="stat-card stat-success">
+        <div class="stat-icon">📋</div>
+        <div>
+            <div class="stat-value" id="stat-events">{{ total_events }}</div>
+            <div class="stat-label">Total Detections</div>
+        </div>
+    </div>
+    <div class="stat-card stat-warning">
+        <div class="stat-icon">🔔</div>
+        <div>
+            <div class="stat-value" id="stat-alerts">{{ unresolved_alerts }}</div>
+            <div class="stat-label">Unresolved Alerts</div>
+        </div>
+    </div>
+</div>
+
+<!-- ROW 1: Activity Feed + Chart -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
+
+    <!-- Live Activity Feed -->
+    <div class="card">
+        <div class="card-title">
+            🔴 Live Activity Feed
+            <span style="float:right; font-size:0.75rem; font-weight:400; color:#10b981;" id="feed-status">Listening...</span>
+        </div>
+        <div id="activity-feed">
+            {% for ev in recent_events %}
+            <div class="feed-item">
+                <span class="feed-icon">📦</span>
+                <div class="feed-text">
+                    <strong>{{ ev.product_name }}</strong> — {{ ev.quantity_removed }} removed
+                    <span class="badge badge-gray">conf: {{ "%.0f"|format(ev.confidence * 100) }}%</span>
+                </div>
+                <div class="feed-time">{{ ev.timestamp.strftime('%H:%M:%S') }}</div>
+            </div>
+            {% else %}
+            <div style="color:#94a3b8; font-size:0.85rem; padding:16px 0;">No detections yet. Run a simulation below.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Category Chart -->
+    <div class="card">
+        <div class="card-title">📊 Products by Category</div>
+        <canvas id="catChart" height="200"></canvas>
+    </div>
+
+</div>
+
+<!-- ROW 2: Low Stock + Recent Alerts + Simulate Button -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
+
+    <!-- Low Stock Products -->
+    <div class="card">
+        <div class="card-title">⚠️ Low Stock Products</div>
+        {% if low_stock_products %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Stock</th>
+                    <th>Threshold</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in low_stock_products %}
+                <tr>
+                    <td>{{ p.image_url }} {{ p.name }}</td>
+                    <td>
+                        <strong style="color: {% if p.stock == 0 %}#ef4444{% else %}#f59e0b{% endif %}">
+                            {{ p.stock }}
+                        </strong>
+                        <div class="stock-bar">
+                            <div class="stock-fill" style="
+                                width: {{ [p.stock / (p.threshold * 2) * 100, 100]|min }}%;
+                                background: {% if p.stock == 0 %}#ef4444{% elif p.stock <= p.threshold %}#f59e0b{% else %}#10b981{% endif %};
+                            "></div>
+                        </div>
+                    </td>
+                    <td style="color:#94a3b8">{{ p.threshold }}</td>
+                    <td>
+                        {% if p.stock == 0 %}
+                        <span class="badge badge-danger">Out of Stock</span>
+                        {% else %}
+                        <span class="badge badge-warning">Low Stock</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="color:#10b981; font-size:0.88rem; padding:16px 0;">
+            ✅ All products are well stocked!
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="card">
+        <div class="card-title">🔔 Recent Alerts</div>
+        {% if recent_alerts %}
+        {% for al in recent_alerts %}
+        <div style="padding:10px 0; border-bottom:1px solid #334155; font-size:0.85rem;">
+            <div style="color:#fcd34d;">⚠️ {{ al.message }}</div>
+            <div style="color:#94a3b8; font-size:0.75rem; margin-top:3px;">
+                {{ al.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+            </div>
+        </div>
+        {% endfor %}
+        <a href="{{ url_for('alerts') }}" class="btn btn-outline btn-sm" style="margin-top:12px;">
+            View All Alerts →
+        </a>
+        {% else %}
+        <div style="color:#10b981; font-size:0.88rem; padding:16px 0;">
+            ✅ No active alerts.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Simulate + Navigation Buttons -->
+<div style="display:flex; gap:12px; flex-wrap:wrap;">
+    <button class="btn btn-primary" id="btn-simulate" onclick="runSimulation()">
+        🎲 Simulate Detection
+    </button>
+    <a href="{{ url_for('live_detection') }}" class="btn btn-success">
+        📷 Open Live Camera
+    </a>
+    <a href="{{ url_for('inventory') }}" class="btn btn-outline">
+        📦 View Inventory
+    </a>
+    {% if session.role == 'admin' %}
+    <a href="{{ url_for('export_excel') }}" class="btn btn-warning">
+        📊 Export Excel
+    </a>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Category Chart ──────────────────────────────────────────────────
+const ctx = document.getElementById('catChart').getContext('2d');
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ cat_labels|safe }},
+        datasets: [{
+            data: {{ cat_counts|safe }},
+            backgroundColor: [
+                '#4f46e5', '#06b6d4', '#10b981', '#f59e0b',
+                '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'
+            ],
+            borderColor: '#1e293b',
+            borderWidth: 2,
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { color: '#94a3b8', font: { size: 11 } }
+            }
+        }
+    }
+});
+
+// ── Simulate Detection ──────────────────────────────────────────────
+async function runSimulation() {
+    const btn = document.getElementById('btn-simulate');
+    btn.textContent = '⏳ Simulating...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/detect/simulate', { method: 'POST' });
+        const data = await resp.json();
+        if (data.detected && data.detected.length > 0) {
+            for (const item of data.detected) {
+                addFeedItem(item);
+            }
+            showToast(`✅ Simulation: ${data.detected.length} event(s) processed`, 'success');
+        } else {
+            showToast('ℹ️ Simulation: shelf quiet this time.', 'info');
+        }
+    } catch (err) {
+        showToast('❌ Simulation failed: ' + err.message, 'danger');
+    } finally {
+        btn.textContent = '🎲 Simulate Detection';
+        btn.disabled = false;
+    }
+}
+
+// ── Add item to activity feed ───────────────────────────────────────
+function addFeedItem(item) {
+    const feed = document.getElementById('activity-feed');
+    const div  = document.createElement('div');
+    div.className = 'feed-item';
+    const now = new Date().toLocaleTimeString();
+    div.innerHTML = `
+        <span class="feed-icon">📦</span>
+        <div class="feed-text">
+            <strong>${item.product || item.label}</strong>
+            — ${item.quantity || 1} removed
+            <span class="badge badge-gray">conf: ${Math.round((item.confidence || 0) * 100)}%</span>
+        </div>
+        <div class="feed-time">${now}</div>
+    `;
+    feed.insertBefore(div, feed.firstChild);
+    // Keep max 20 items
+    while (feed.children.length > 20) feed.removeChild(feed.lastChild);
+}
+
+// ── Socket real-time updates ────────────────────────────────────────
+socket.on('inventory_update', data => {
+    addFeedItem(data);
+    // Update stat counter
+    const el = document.getElementById('stat-events');
+    if (el) el.textContent = parseInt(el.textContent) + 1;
+});
+</script>
+{% endblock %}

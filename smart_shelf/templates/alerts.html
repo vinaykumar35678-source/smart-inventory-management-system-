@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block page_title %}🔔 Alerts{% endblock %}
+
+{% block content %}
+
+<!-- Summary row -->
+<div style="display:flex; gap:12px; margin-bottom:20px; align-items:center;">
+    {% set unresolved = alerts | selectattr('is_resolved', 'equalto', false) | list %}
+    {% set resolved   = alerts | selectattr('is_resolved', 'equalto', true)  | list %}
+    <span class="badge badge-danger" style="font-size:0.85rem; padding:6px 14px;">
+        {{ unresolved|length }} Unresolved
+    </span>
+    <span class="badge badge-success" style="font-size:0.85rem; padding:6px 14px;">
+        {{ resolved|length }} Resolved
+    </span>
+    <span style="margin-left:auto; color:#94a3b8; font-size:0.85rem;">
+        {{ alerts|length }} total alerts
+    </span>
+</div>
+
+{% if alerts %}
+<div class="card" style="padding:0; overflow:hidden;">
+    <table>
+        <thead>
+            <tr>
+                <th style="padding:14px 16px;">Alert Message</th>
+                <th>Product</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for al in alerts %}
+            <tr>
+                <td style="padding:12px 16px;">
+                    {% if not al.is_resolved %}
+                    <span style="color:#fcd34d;">⚠️</span>
+                    {% else %}
+                    <span style="color:#10b981;">✅</span>
+                    {% endif %}
+                    {{ al.message }}
+                </td>
+                <td>
+                    <span class="badge badge-info">{{ al.product_name }}</span>
+                </td>
+                <td style="color:#94a3b8; font-size:0.82rem;">
+                    {{ al.timestamp.strftime('%d %b %Y %H:%M:%S') }}
+                </td>
+                <td>
+                    {% if al.is_resolved %}
+                    <span class="badge badge-success">Resolved</span>
+                    {% else %}
+                    <span class="badge badge-warning">Active</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not al.is_resolved %}
+                    <form method="POST" action="{{ url_for('resolve_alert', alert_id=al.id) }}"
+                          style="display:inline;">
+                        <button type="submit" class="btn btn-success btn-sm">
+                            ✓ Resolve
+                        </button>
+                    </form>
+                    {% else %}
+                    <span style="color:#94a3b8; font-size:0.78rem;">
+                        {{ al.resolved_at.strftime('%H:%M') if al.resolved_at else '—' }}
+                    </span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:48px;">
+    <div style="font-size:3rem; margin-bottom:12px;">✅</div>
+    <div style="font-size:1.1rem; font-weight:600;">No alerts found</div>
+    <div style="color:#94a3b8; font-size:0.88rem; margin-top:6px;">
+        All products are properly stocked. Great work!
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Real-time new alerts via SocketIO
+socket.on('alert', data => {
+    showToast('⚠️ ' + data.message, 'warning', 6000);
+    // Reload after a moment to show new alert in table
+    setTimeout(() => location.reload(), 2000);
+});
+</script>
+{% endblock %}

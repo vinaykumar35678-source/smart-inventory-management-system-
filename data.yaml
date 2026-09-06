@@ -1,0 +1,24 @@
+# Dataset configuration for YOLO Custom Smart Shelf Product Detection
+path: ./dataset
+train: images/train
+val: images/val
+test: images/test
+
+# Number of classes
+nc: 13
+
+# Class names mapping
+names:
+  0: Apple
+  1: Banana
+  2: Milk
+  3: Water Bottle
+  4: Bread
+  5: Lays
+  6: Biscuits
+  7: Mobile
+  8: Chair
+  9: Table
+  10: Book
+  11: Pen
+  12: ID Card

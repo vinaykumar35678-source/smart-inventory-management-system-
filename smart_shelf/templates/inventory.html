@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}📦 Inventory{% endblock %}
+
+{% block content %}
+
+<!-- Search & Filter Bar -->
+<div style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:center;">
+    <input type="text" id="search-input" placeholder="🔍 Search products..."
+           style="background:#1e293b; border:1px solid #334155; color:#f1f5f9;
+                  padding:9px 14px; border-radius:8px; font-size:0.88rem;
+                  font-family:inherit; outline:none; width:220px;">
+    <select id="category-filter"
+            style="background:#1e293b; border:1px solid #334155; color:#f1f5f9;
+                   padding:9px 14px; border-radius:8px; font-size:0.88rem;
+                   font-family:inherit; outline:none;">
+        <option value="">All Categories</option>
+        {% set categories = products | map(attribute='category') | unique | sort %}
+        {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+        {% endfor %}
+    </select>
+    <select id="status-filter"
+            style="background:#1e293b; border:1px solid #334155; color:#f1f5f9;
+                   padding:9px 14px; border-radius:8px; font-size:0.88rem;
+                   font-family:inherit; outline:none;">
+        <option value="">All Status</option>
+        <option value="low">Low Stock</option>
+        <option value="ok">OK</option>
+        <option value="out">Out of Stock</option>
+    </select>
+    <span style="margin-left:auto; color:#94a3b8; font-size:0.85rem;">
+        {{ products|length }} products
+    </span>
+</div>
+
+<!-- Products Table -->
+<div class="card" style="padding:0; overflow:hidden;">
+    <table id="products-table">
+        <thead>
+            <tr>
+                <th style="padding:14px 16px;">Product</th>
+                <th>Category</th>
+                <th>Stock</th>
+                <th>Threshold</th>
+                <th>Price (Rs)</th>
+                <th>Status</th>
+                <th>Last Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr class="product-row"
+                data-name="{{ p.name|lower }}"
+                data-category="{{ p.category }}"
+                data-status="{% if p.stock == 0 %}out{% elif p.stock <= p.threshold %}low{% else %}ok{% endif %}">
+                <td style="padding:12px 16px;">
+                    <span style="font-size:1.2rem;">{{ p.image_url }}</span>
+                    <strong style="margin-left:6px;">{{ p.name }}</strong>
+                </td>
+                <td><span class="badge badge-info">{{ p.category }}</span></td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <strong class="stock-val-{{ p.id }}" style="
+                            color: {% if p.stock == 0 %}#ef4444
+                                   {% elif p.stock <= p.threshold %}#f59e0b
+                                   {% else %}#10b981{% endif %};">
+                            {{ p.stock }}
+                        </strong>
+                        <div class="stock-bar" style="width:80px;">
+                            <div class="stock-fill stock-fill-{{ p.id }}"
+                                 style="width:{{ [p.stock / ([p.threshold * 3, 1]|max) * 100, 100]|min }}%;
+                                        background:{% if p.stock == 0 %}#ef4444{% elif p.stock <= p.threshold %}#f59e0b{% else %}#10b981{% endif %};">
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td style="color:#94a3b8;">{{ p.threshold }}</td>
+                <td>Rs {{ "%.2f"|format(p.price) }}</td>
+                <td>
+                    {% if p.stock == 0 %}
+                    <span class="badge badge-danger">Out of Stock</span>
+                    {% elif p.stock <= p.threshold %}
+                    <span class="badge badge-warning">Low Stock</span>
+                    {% else %}
+                    <span class="badge badge-success">In Stock</span>
+                    {% endif %}
+                </td>
+                <td style="color:#94a3b8; font-size:0.8rem;">
+                    {{ p.updated_at.strftime('%d %b %Y %H:%M') if p.updated_at else '-' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align:center; padding:32px; color:#94a3b8;">No products found.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Search & Filter ─────────────────────────────────────────────────
+function applyFilters() {
+    const search   = document.getElementById('search-input').value.toLowerCase();
+    const catF     = document.getElementById('category-filter').value;
+    const statusF  = document.getElementById('status-filter').value;
+    const rows     = document.querySelectorAll('.product-row');
+
+    rows.forEach(row => {
+        const nameMatch = row.dataset.name.includes(search);
+        const catMatch  = !catF  || row.dataset.category === catF;
+        const statMatch = !statusF || row.dataset.status === statusF;
+        row.style.display = (nameMatch && catMatch && statMatch) ? '' : 'none';
+    });
+}
+
+document.getElementById('search-input').addEventListener('input', applyFilters);
+document.getElementById('category-filter').addEventListener('change', applyFilters);
+document.getElementById('status-filter').addEventListener('change', applyFilters);
+
+// ── Real-time stock update via SocketIO ─────────────────────────────
+function updateStockDisplay(data) {
+    // We don't have product IDs in the event — find by name in DOM
+    const rows = document.querySelectorAll('.product-row');
+    rows.forEach(row => {
+        const nameCell = row.querySelector('strong');
+        if (nameCell && nameCell.textContent.trim() === data.product) {
+            // Find the stock value display
+            const valEl  = row.querySelector('[class^="stock-val-"]');
+            const fillEl = row.querySelector('[class^="stock-fill-"]');
+            if (valEl && data.stock !== null) {
+                valEl.textContent = data.stock;
+                const threshold = parseInt(row.children[3].textContent) || 5;
+                const pct = Math.min((data.stock / (threshold * 3)) * 100, 100);
+                if (fillEl) fillEl.style.width = pct + '%';
+                const color = data.stock === 0 ? '#ef4444'
+                            : data.stock <= threshold ? '#f59e0b' : '#10b981';
+                valEl.style.color = color;
+                if (fillEl) fillEl.style.background = color;
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

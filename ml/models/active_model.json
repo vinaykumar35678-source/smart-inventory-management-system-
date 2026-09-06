@@ -1,0 +1,7 @@
+{
+  "active_model_id": "pretrained_yolov8n",
+  "model_name": "Pretrained YOLOv8 Nano",
+  "model_path": "yolov8n.pt",
+  "is_custom": false,
+  "activated_at": "2026-09-03T19:53:11.568375"
+}
