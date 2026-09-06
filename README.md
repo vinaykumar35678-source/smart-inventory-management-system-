@@ -4,8 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI_0.131-009688.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/Frontend-React_18%2F19-61dafb.svg)](https://react.dev/)
 [![YOLO11/v8](https://img.shields.io/badge/Computer_Vision-YOLO11_Ultralytics-brightgreen.svg)](https://ultralytics.com/)
-[![ByteTrack](https://img.shields.io/badge/Object_Tracking-ByteTrack-orange.svg)](https://github.com/ifzhang/ByteTrack)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+[![License: CC BY-ND 4.0](https://img.shields.io/badge/License-CC_BY--ND_4.0-lightgrey.svg)](LICENSE.md)
 
 An enterprise-grade, real-time Computer Vision inventory monitoring, multi-product tracking, shelf spatial analysis, and loss-prevention platform designed for modern retail environments, automated convenience stores, and smart warehouses.
 
@@ -341,4 +340,4 @@ When an item's validated quantity drops to or below its threshold:
 
 ## 📄 License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Creative Commons Attribution-NoDerivatives 4.0 International Public License (CC BY-ND 4.0) — see the [LICENSE.md](LICENSE.md) file for details.
