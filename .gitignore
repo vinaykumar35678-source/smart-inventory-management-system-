@@ -1,34 +1,65 @@
-# Environment variables & secrets
+# ==============================================================================
+# SmartShelf Vision AI - Comprehensive .gitignore
+# ==============================================================================
+
+# Environment variables & secrets (NEVER commit credentials)
 .env
 *.env
 .env.*
 !.env.example
+*.pem
+*.key
+*.cert
 
-# Python & Artifacts
+# Python virtual environments & bytecode
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
 .venv/
 env/
+.pytest_cache/
+
+# Databases & local persistent storage
+*.sqlite
 *.sqlite3
 *.db
-*.xlsx
-*.log
+*.db-journal
 
-# Node / Frontend
+# ML Datasets (Large binary media - downloaded on demand)
+ml/datasets/raw/
+ml/datasets/processed/
+ml/datasets/merged/
+ml/datasets/validation/
+smart_shelf/dataset/
+runs/
+smart_shelf/runs/
+
+# Keep dataset documentation and manifests
+!ml/datasets/README.md
+!ml/datasets/dataset_manifest.json
+!ml/datasets/dataset_report.html
+
+# Node / React Frontend artifacts
 node_modules/
 dist/
 build/
-.npm
+.npm/
 .eslintcache
 
-# IDE
-.vscode/
-.idea/
+# Logs & Temporary files
+*.log
+*.tmp
+*.bak
 *.swp
 *.swo
+temp/
+tmp/
+scratch/
 
-# OS
+# IDE & OS files
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+Desktop.ini

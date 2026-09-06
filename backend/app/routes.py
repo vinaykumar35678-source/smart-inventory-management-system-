@@ -1193,13 +1193,52 @@ import json
 import threading
 from ml.scripts.dataset_manager import dataset_manager
 from ml.scripts.model_manager import model_manager
-from ml.training.train import run_custom_training, get_current_progress, CONFIG_FILE
+from ml.training.train import run_custom_training, get_current_progress, check_system_resources, CONFIG_FILE
+from ml.scripts.prepare_dataset import prepare_and_merge_datasets
+from ml.scripts.download_datasets import ingest_local_retail_dataset
+from ml.scripts.validate_dataset import validate_yolo_dataset, generate_html_report, REPORT_HTML_FILE
 from .schemas import DatasetImportRequest, DatasetValidateRequest, TrainingLaunchRequest, ModelTestRequest
 
 @router.get("/ml/datasets")
 def list_ml_datasets(current_user: models.User = Depends(get_current_user)):
     """List available datasets in ml/datasets and existing project directories."""
     return dataset_manager.list_datasets()
+
+@router.post("/ml/datasets/download")
+def download_ml_datasets(current_user: models.User = Depends(require_admin)):
+    """Ingest approved permissive retail datasets into ml/datasets/raw/."""
+    try:
+        res = ingest_local_retail_dataset()
+        return {"status": "SUCCESS", "result": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/ml/datasets/prepare")
+def prepare_ml_dataset(current_user: models.User = Depends(require_admin)):
+    """Normalize raw datasets, deduplicate, perform 70/20/10 split, and generate data.yaml."""
+    try:
+        res = prepare_and_merge_datasets()
+        # Also run validation and generate HTML report
+        val_rep = validate_yolo_dataset()
+        generate_html_report(val_rep)
+        return {"status": "SUCCESS", "preparation": res, "validation": val_rep["summary"]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/ml/datasets/report")
+def get_ml_dataset_report(current_user: models.User = Depends(get_current_user)):
+    """Serve the generated interactive HTML dataset audit report."""
+    if not os.path.exists(REPORT_HTML_FILE):
+        val_rep = validate_yolo_dataset()
+        generate_html_report(val_rep)
+    if os.path.exists(REPORT_HTML_FILE):
+        return FileResponse(REPORT_HTML_FILE, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Dataset report not found.")
+
+@router.get("/ml/system/resources")
+def get_ml_system_resources(current_user: models.User = Depends(get_current_user)):
+    """Check system RAM, disk space, and GPU/CPU availability for training safety."""
+    return check_system_resources()
 
 @router.post("/ml/datasets/import")
 def import_ml_dataset(
@@ -1247,7 +1286,7 @@ def get_training_config(current_user: models.User = Depends(get_current_user)):
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"model_type": "yolov8n.pt", "epochs": 20, "batch_size": 8, "image_size": 640}
+    return {"model_type": "yolo11n.pt", "epochs": 20, "batch_size": 8, "image_size": 640}
 
 @router.put("/ml/training/config")
 def update_training_config(
@@ -1305,12 +1344,37 @@ def list_ml_models(current_user: models.User = Depends(get_current_user)):
 @router.post("/ml/models/{model_id}/activate")
 def activate_ml_model(
     model_id: str,
+    db: Session = Depends(get_db),
     current_user: models.User = Depends(require_admin)
 ):
-    """Set active model for the real-time detection pipeline."""
+    """Set active model for the real-time detection pipeline and sync classes to DB."""
     try:
-        active_record = model_manager.activate_model(model_id)
+        active_record = model_manager.activate_model(model_id, db=db)
         return {"status": "SUCCESS", "active_model": active_record}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/ml/models/rollback")
+def rollback_ml_model(
+    current_user: models.User = Depends(require_admin)
+):
+    """Revert active model to verified base model."""
+    try:
+        res = model_manager.rollback_model()
+        return {"status": "SUCCESS", "active_model": res}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/ml/models/{model_id}/sync-db")
+def sync_model_to_db(
+    model_id: str,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_admin)
+):
+    """Sync model classes to products table in SQLite."""
+    try:
+        res = model_manager.sync_classes_to_db(model_id, db)
+        return res
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1334,6 +1398,7 @@ def test_ml_model(
 def compare_ml_models(current_user: models.User = Depends(get_current_user)):
     """Compare performance metrics between pretrained and custom-trained models."""
     return model_manager.compare_models()
+
 
 
 # ── Gmail / SMTP Notifications Endpoints ─────────────────────────────────────

@@ -1,0 +1,35 @@
+{
+  "manifest_version": "1.0",
+  "created_at": "2026-09-06T19:42:54.033527",
+  "datasets": {
+    "smart_shelf_retail_base": {
+      "dataset_name": "SmartShelf Retail Core Dataset",
+      "source": "SmartShelf Project Local Benchmark",
+      "version": "1.0",
+      "license": "MIT License / Permissive Open Source",
+      "commercial_use_permitted": true,
+      "academic_use_permitted": true,
+      "annotation_format": "YOLO Detection (txt)",
+      "num_classes": 13,
+      "classes": [
+        "Apple",
+        "Banana",
+        "Milk",
+        "Water Bottle",
+        "Bread",
+        "Lays",
+        "Biscuits",
+        "Mobile",
+        "Chair",
+        "Table",
+        "Book",
+        "Pen",
+        "ID Card"
+      ],
+      "num_images": 150,
+      "raw_path": "ml\\datasets\\raw\\smart_shelf_retail",
+      "ingested_at": "2026-09-06T19:42:54.033647"
+    }
+  },
+  "last_updated": "2026-09-06T19:42:54.033660"
+}

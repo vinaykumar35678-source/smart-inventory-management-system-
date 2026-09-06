@@ -1,0 +1,168 @@
+{
+  "taxonomy_version": "1.2.0",
+  "description": "SmartShelf Multi-Product Canonical Retail Product Taxonomy",
+  "classes": [
+    {
+      "canonical_name": "Apple",
+      "category": "Fruits",
+      "default_class_id": 0,
+      "sku": "FRT-APPL-001",
+      "default_threshold": 10,
+      "default_price": 1.5,
+      "aliases": ["apple", "red apple", "green apple", "fresh apple"]
+    },
+    {
+      "canonical_name": "Banana",
+      "category": "Fruits",
+      "default_class_id": 1,
+      "sku": "FRT-BANA-001",
+      "default_threshold": 10,
+      "default_price": 0.8,
+      "aliases": ["banana", "yellow banana", "bananas"]
+    },
+    {
+      "canonical_name": "Milk",
+      "category": "Dairy",
+      "default_class_id": 2,
+      "sku": "DRY-MILK-001",
+      "default_threshold": 5,
+      "default_price": 3.2,
+      "aliases": ["milk", "milk 1l", "milk carton", "milk bottle", "dairy milk"]
+    },
+    {
+      "canonical_name": "Water Bottle",
+      "category": "Beverages",
+      "default_class_id": 3,
+      "sku": "BEV-WATR-001",
+      "default_threshold": 8,
+      "default_price": 1.2,
+      "aliases": ["water bottle", "mineral water", "water", "aquafina", "kinley"]
+    },
+    {
+      "canonical_name": "Bread",
+      "category": "Bakery",
+      "default_class_id": 4,
+      "sku": "BAK-BRED-001",
+      "default_threshold": 5,
+      "default_price": 2.5,
+      "aliases": ["bread", "sliced bread", "white bread", "brown bread", "loaf"]
+    },
+    {
+      "canonical_name": "Lays",
+      "category": "Snacks",
+      "default_class_id": 5,
+      "sku": "SNK-LAYS-001",
+      "default_threshold": 6,
+      "default_price": 1.8,
+      "aliases": ["lays", "lays chips", "potato chips", "lays classic", "chips"]
+    },
+    {
+      "canonical_name": "Biscuits",
+      "category": "Snacks",
+      "default_class_id": 6,
+      "sku": "SNK-BISC-001",
+      "default_threshold": 6,
+      "default_price": 2.0,
+      "aliases": ["biscuits", "cookies", "biscuit packet", "parle-g", "marie"]
+    },
+    {
+      "canonical_name": "Coca Cola",
+      "category": "Beverages",
+      "default_class_id": 7,
+      "sku": "BEV-COCA-001",
+      "default_threshold": 5,
+      "default_price": 2.0,
+      "aliases": ["coca cola", "coke", "coca-cola", "coke can", "coca cola 500ml"]
+    },
+    {
+      "canonical_name": "Pepsi",
+      "category": "Beverages",
+      "default_class_id": 8,
+      "sku": "BEV-PEPS-001",
+      "default_threshold": 5,
+      "default_price": 2.0,
+      "aliases": ["pepsi", "pepsi can", "pepsi bottle", "pepsi cola"]
+    },
+    {
+      "canonical_name": "Sprite",
+      "category": "Beverages",
+      "default_class_id": 9,
+      "sku": "BEV-SPRI-001",
+      "default_threshold": 5,
+      "default_price": 2.0,
+      "aliases": ["sprite", "sprite can", "sprite bottle"]
+    },
+    {
+      "canonical_name": "Oreo",
+      "category": "Snacks",
+      "default_class_id": 10,
+      "sku": "SNK-OREO-001",
+      "default_threshold": 5,
+      "default_price": 2.5,
+      "aliases": ["oreo", "oreo biscuits", "oreo cookies"]
+    },
+    {
+      "canonical_name": "KitKat",
+      "category": "Snacks",
+      "default_class_id": 11,
+      "sku": "SNK-KITK-001",
+      "default_threshold": 5,
+      "default_price": 1.75,
+      "aliases": ["kitkat", "kit kat", "chocolate bar", "kit-kat"]
+    },
+    {
+      "canonical_name": "Mobile",
+      "category": "Electronics",
+      "default_class_id": 12,
+      "sku": "ELC-MOBL-001",
+      "default_threshold": 2,
+      "default_price": 299.0,
+      "aliases": ["mobile", "cell phone", "phone", "smartphone"]
+    },
+    {
+      "canonical_name": "Chair",
+      "category": "Furniture",
+      "default_class_id": 13,
+      "sku": "FUR-CHAI-001",
+      "default_threshold": 2,
+      "default_price": 45.0,
+      "aliases": ["chair", "office chair", "seat"]
+    },
+    {
+      "canonical_name": "Table",
+      "category": "Furniture",
+      "default_class_id": 14,
+      "sku": "FUR-TABL-001",
+      "default_threshold": 2,
+      "default_price": 85.0,
+      "aliases": ["table", "desk", "checkout counter"]
+    },
+    {
+      "canonical_name": "Book",
+      "category": "Stationery",
+      "default_class_id": 15,
+      "sku": "STN-BOOK-001",
+      "default_threshold": 5,
+      "default_price": 12.0,
+      "aliases": ["book", "notebook", "novel", "textbook"]
+    },
+    {
+      "canonical_name": "Pen",
+      "category": "Stationery",
+      "default_class_id": 16,
+      "sku": "STN-PENN-001",
+      "default_threshold": 10,
+      "default_price": 1.0,
+      "aliases": ["pen", "ballpoint pen", "marker"]
+    },
+    {
+      "canonical_name": "ID Card",
+      "category": "Stationery",
+      "default_class_id": 17,
+      "sku": "STN-IDCD-001",
+      "default_threshold": 2,
+      "default_price": 5.0,
+      "aliases": ["id card", "badge", "identity card", "employee card"]
+    }
+  ]
+}

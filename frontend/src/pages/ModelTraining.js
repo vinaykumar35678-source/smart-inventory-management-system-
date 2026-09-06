@@ -21,14 +21,17 @@ function ModelTraining() {
     const [importName, setImportName] = useState("");
     const [importPath, setImportPath] = useState("");
     const [isImporting, setIsImporting] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [isPreparing, setIsPreparing] = useState(false);
+    const [systemResources, setSystemResources] = useState(null);
 
     // Training Config & Progress
     const [trainingConfig, setTrainingConfig] = useState({
-        base_model: "yolov8n.pt",
+        base_model: "yolo11s.pt",
         epochs: 20,
         batch_size: 8,
         image_size: 640,
-        model_name: "inventory_v1"
+        model_name: "inventory_yolo11"
     });
     const [trainingStatus, setTrainingStatus] = useState({
         status: "NOT_STARTED",
@@ -60,11 +63,12 @@ function ModelTraining() {
     // ── Initial Fetch ──────────────────────────────────────
     const fetchInitialData = async () => {
         try {
-            const [dsRes, modRes, cfgRes, compRes] = await Promise.all([
+            const [dsRes, modRes, cfgRes, compRes, resRes] = await Promise.all([
                 api.get("/ml/datasets"),
                 api.get("/ml/models"),
                 api.get("/ml/training/config"),
-                api.get("/ml/models/compare")
+                api.get("/ml/models/compare"),
+                api.get("/ml/system/resources").catch(() => ({ data: null }))
             ]);
             setDatasets(dsRes.data);
             if (dsRes.data.length > 0) {
@@ -83,6 +87,9 @@ function ModelTraining() {
                 setTrainingConfig(prev => ({ ...prev, ...cfgRes.data }));
             }
             setComparison(compRes.data);
+            if (resRes?.data) {
+                setSystemResources(resRes.data);
+            }
         } catch (err) {
             console.error("Failed to load ML data:", err);
         }
@@ -92,6 +99,7 @@ function ModelTraining() {
         fetchInitialData();
         return () => clearInterval(pollTimerRef.current);
     }, []);
+
 
     // ── Poll Training Status ────────────────────────────────
     useEffect(() => {
@@ -215,6 +223,55 @@ function ModelTraining() {
         }
     };
 
+    // ── Dataset Actions & Rollback ─────────────────────────
+    const handleDownloadDatasets = async () => {
+        setIsDownloading(true);
+        try {
+            await api.post("/ml/datasets/download");
+            alert("Approved retail dataset successfully ingested into ml/datasets/raw/!");
+            fetchInitialData();
+        } catch (err) {
+            alert("Download error: " + (err.response?.data?.detail || err.message));
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    const handlePrepareDatasets = async () => {
+        setIsPreparing(true);
+        try {
+            await api.post("/ml/datasets/prepare");
+            alert("Multi-product dataset normalized, deduplicated, and split (70% train / 20% val / 10% test) into ml/datasets/merged/!");
+            fetchInitialData();
+        } catch (err) {
+            alert("Preparation error: " + (err.response?.data?.detail || err.message));
+        } finally {
+            setIsPreparing(false);
+        }
+    };
+
+    const handleRollbackModel = async () => {
+        if (!window.confirm("Rollback active model to verified base architecture?")) return;
+        try {
+            const res = await api.post("/ml/models/rollback");
+            setActiveModelId(res.data.active_model.active_model_id);
+            setModels(prev => prev.map(m => ({ ...m, is_active: m.model_id === res.data.active_model.active_model_id })));
+            alert(`Rolled back successfully to '${res.data.active_model.model_name}'!`);
+        } catch (err) {
+            alert("Rollback failed: " + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const handleSyncDb = async (modelId) => {
+        try {
+            const res = await api.post(`/ml/models/${modelId}/sync-db`);
+            alert(`Synchronized ${res.data.synced_count} classes to products database table!`);
+        } catch (err) {
+            alert("Database sync failed: " + (err.response?.data?.detail || err.message));
+        }
+    };
+
+
     // ── Test Model on Image ────────────────────────────────
     const handleImageUpload = (e) => {
         const file = e.target.files[0];
@@ -293,6 +350,27 @@ function ModelTraining() {
                         <div className="section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <Database size={18} color="var(--primary)" />
                             Available Inventory Datasets
+                        </div>
+
+                        {/* Quick Dataset Pipeline Actions */}
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                            <button className="btn btn-sm btn-ghost" onClick={handleDownloadDatasets} disabled={isDownloading} style={{ border: "1px solid var(--border)" }}>
+                                <RefreshCw size={13} className={isDownloading ? "animate-spin" : ""} style={{ marginRight: 4 }} />
+                                {isDownloading ? "Ingesting..." : "Ingest Retail Datasets"}
+                            </button>
+                            <button className="btn btn-sm btn-ghost" onClick={handlePrepareDatasets} disabled={isPreparing} style={{ border: "1px solid var(--border)" }}>
+                                <Layers size={13} className={isPreparing ? "animate-spin" : ""} style={{ marginRight: 4 }} />
+                                {isPreparing ? "Preparing..." : "Merge Multi-Product (70/20/10)"}
+                            </button>
+                            <a
+                                href="http://localhost:8000/api/ml/datasets/report"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-sm btn-ghost"
+                                style={{ display: "flex", alignItems: "center", gap: 4, textDecoration: "none", border: "1px solid var(--border)" }}
+                            >
+                                <Eye size={13} /> View HTML Audit Report
+                            </a>
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
                             {datasets.map(ds => (
@@ -502,6 +580,22 @@ function ModelTraining() {
                             Custom YOLO Training Studio
                         </div>
 
+                        {/* Hardware Resource Pre-flight Banner */}
+                        {systemResources && (
+                            <div style={{ padding: "10px 14px", background: "rgba(15,23,42,0.8)", borderRadius: 8, border: "1px solid var(--border)", marginBottom: 14 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.8rem", flexWrap: "wrap", gap: 8 }}>
+                                    <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--accent-cyan)", fontWeight: 600 }}>
+                                        <Cpu size={14} /> Hardware Pre-Flight: {systemResources.device} ({systemResources.device_name})
+                                    </span>
+                                    <span>RAM: <strong>{systemResources.ram_available_gb} GB free</strong></span>
+                                    <span>Disk: <strong>{systemResources.disk_free_gb} GB free</strong></span>
+                                    <span className={`badge ${systemResources.is_safe ? "badge-green" : "badge-red"}`}>
+                                        {systemResources.is_safe ? "SYSTEM SAFE" : "LOW RESOURCES"}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+
                         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                             <div className="form-group">
                                 <label className="form-label">Pretrained Base Model (Transfer Learning)</label>
@@ -510,10 +604,10 @@ function ModelTraining() {
                                     value={trainingConfig.base_model}
                                     onChange={e => setTrainingConfig({ ...trainingConfig, base_model: e.target.value })}
                                 >
-                                    <option value="yolov8n.pt">YOLOv8 Nano (Fastest, Light memory, Recommended)</option>
-                                    <option value="yolov8s.pt">YOLOv8 Small (Balanced accuracy &amp; speed)</option>
-                                    <option value="yolov8m.pt">YOLOv8 Medium (High precision)</option>
-                                    <option value="yolo11n.pt">YOLO11 Nano (Next-generation architecture)</option>
+                                    <option value="yolo11s.pt">YOLO11 Small (Recommended — Multi-Product Retail)</option>
+                                    <option value="yolo11n.pt">YOLO11 Nano (Next-Gen, Fast CPU Execution)</option>
+                                    <option value="yolov8n.pt">YOLOv8 Nano (Legacy Baseline Fallback)</option>
+                                    <option value="yolov8s.pt">YOLOv8 Small (Balanced)</option>
                                 </select>
                             </div>
 
@@ -649,9 +743,20 @@ function ModelTraining() {
                             <Layers size={18} color="var(--primary)" />
                             Model Registry &amp; Active Detection Pipeline
                         </div>
-                        <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 16 }}>
+                        <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 12 }}>
                             Multiple trained models can be maintained concurrently. The active model directly powers the live camera detection and ByteTrack pipeline.
                         </p>
+
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+                            <button className="btn btn-sm btn-outline" onClick={handleRollbackModel}>
+                                <RefreshCw size={13} style={{ marginRight: 6 }} /> Rollback to Baseline Model
+                            </button>
+                            {activeModelId && (
+                                <button className="btn btn-sm btn-outline" onClick={() => handleSyncDb(activeModelId)}>
+                                    <Package size={13} style={{ marginRight: 6 }} /> Sync Active Classes to Inventory DB
+                                </button>
+                            )}
+                        </div>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16 }}>
                             {models.map(m => (
