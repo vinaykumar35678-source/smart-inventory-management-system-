@@ -1,0 +1,152 @@
+{
+  "model_id": "yolo11_smartshelf_pen_lays_bisc",
+  "model_name": "YOLO11s \u2014 SmartShelf Retail (18 Classes)",
+  "version": "v_20260907_100437",
+  "base_model": "yolo11n.pt",
+  "dataset": "merged_retail_inventory",
+  "classes": {
+    "0": "Apple",
+    "1": "Banana",
+    "2": "Milk",
+    "3": "Water Bottle",
+    "4": "Bread",
+    "5": "Lays",
+    "6": "Biscuits",
+    "7": "Coca Cola",
+    "8": "Pepsi",
+    "9": "Sprite",
+    "10": "Oreo",
+    "11": "KitKat",
+    "12": "Mobile",
+    "13": "Chair",
+    "14": "Table",
+    "15": "Book",
+    "16": "Pen",
+    "17": "ID Card"
+  },
+  "num_classes": 18,
+  "training_date": "2026-09-07T10:09:20.145905",
+  "epochs": 5,
+  "batch_size": 8,
+  "image_size": 640,
+  "device": "CPU",
+  "device_name": "CPU",
+  "precision": 0.0842,
+  "recall": 0.5176,
+  "map50": 0.1741,
+  "map50_95": 0.1619,
+  "inference_speed_ms": 82.8,
+  "fps": 12.1,
+  "class_metrics": {
+    "Apple": {
+      "precision": 0.273,
+      "recall": 0.5,
+      "map50": 0.473
+    },
+    "Banana": {
+      "precision": 0.262,
+      "recall": 0.229,
+      "map50": 0.165
+    },
+    "Milk": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "map50": 0.0
+    },
+    "Water Bottle": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "map50": 0.0
+    },
+    "Bread": {
+      "precision": 0.054,
+      "recall": 1.0,
+      "map50": 0.077
+    },
+    "Lays": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "map50": 0.0
+    },
+    "Biscuits": {
+      "precision": 0.037,
+      "recall": 0.5,
+      "map50": 0.03
+    },
+    "Coca Cola": {
+      "precision": 0.105,
+      "recall": 1.0,
+      "map50": 0.153
+    },
+    "Pepsi": {
+      "precision": 0.118,
+      "recall": 1.0,
+      "map50": 0.161
+    },
+    "Sprite": {
+      "precision": 0.111,
+      "recall": 0.5,
+      "map50": 0.523
+    },
+    "Oreo": {
+      "precision": 0.061,
+      "recall": 1.0,
+      "map50": 0.586
+    },
+    "KitKat": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "map50": 0.0
+    },
+    "Mobile": {
+      "precision": 0.074,
+      "recall": 1.0,
+      "map50": 0.095
+    },
+    "Chair": {
+      "precision": 0.084,
+      "recall": 0.518,
+      "map50": 0.174
+    },
+    "Table": {
+      "precision": 0.084,
+      "recall": 0.518,
+      "map50": 0.174
+    },
+    "Book": {
+      "precision": 0.084,
+      "recall": 0.518,
+      "map50": 0.174
+    },
+    "Pen": {
+      "precision": 0.084,
+      "recall": 0.518,
+      "map50": 0.174
+    },
+    "ID Card": {
+      "precision": 0.084,
+      "recall": 0.518,
+      "map50": 0.174
+    }
+  },
+  "poorly_performing_classes": [
+    "Banana",
+    "Milk",
+    "Water Bottle",
+    "Bread",
+    "Lays",
+    "Biscuits",
+    "Coca Cola",
+    "Pepsi",
+    "KitKat",
+    "Mobile",
+    "Chair",
+    "Table",
+    "Book",
+    "Pen",
+    "ID Card"
+  ],
+  "model_path": "D:\\major proj2\\ml\\models\\yolo11_smartshelf_pen_lays_bisc\\best.pt",
+  "status": "READY",
+  "is_active": false
+}

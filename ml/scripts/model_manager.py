@@ -164,7 +164,10 @@ class ModelManager:
             json.dump(active_record, f, indent=2)
 
         # Hot-reload in detector
-        from app.ai.detection.detector import detector
+        try:
+            from app.ai.detection.detector import detector
+        except ImportError:
+            from backend.app.ai.detection.detector import detector
         detector.switch_model(
             model_path=target["model_path"],
             class_map=target.get("classes", None)

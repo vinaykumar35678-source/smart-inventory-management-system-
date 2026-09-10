@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from ... import models
 from ...websocket import manager
+from ...inventory_logic import find_product
 import asyncio
 
 _main_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -63,10 +64,10 @@ class EventEngine:
         status = raw_event.get("status", "VERIFIED")
         metadata = raw_event.get("metadata", {})
 
-        # Find corresponding product in DB
-        product = db.query(models.Product).filter(
-            models.Product.name == product_name
-        ).first()
+        # Find corresponding product in DB safely with aliases
+        product = find_product(db, product_name)
+        if product:
+            product_name = product.name
 
         product_id = product.id if product else None
         initial_stock = product.stock if product else None

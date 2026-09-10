@@ -6,11 +6,32 @@ Usage:
   python inference.py video sample.mp4
   python inference.py image sample.jpg
 """
+import os
 import sys
 import cv2
 from ultralytics import YOLO
 
-def run_inference(source_type="webcam", source_path="0", model_path="yolo11n.pt"):
+def _get_best_model_path():
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(curr_dir)
+    candidates = [
+        os.path.join(root_dir, "ml", "models", "yolo11_smartshelf_pen_lays_bisc", "best.pt"),
+        os.path.join(root_dir, "runs", "train", "yolo11_smartshelf_pen_lays_bisc", "weights", "best.pt"),
+        os.path.join(curr_dir, "runs", "detect", "smart_shelf_model", "weights", "best.pt"),
+        os.path.join(curr_dir, "yolo11n.onnx"),
+        os.path.join(curr_dir, "yolo11n.pt"),
+        "yolo11n.pt"
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "yolo11n.pt"
+
+def run_inference(source_type="webcam", source_path="0", model_path=None):
+    if model_path is None or not os.path.exists(model_path):
+        model_path = _get_best_model_path()
+
+    print(f"[INFO] Loading model from: {model_path}")
     model = YOLO(model_path)
     
     # 1. Single Image Inference

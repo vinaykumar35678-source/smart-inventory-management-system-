@@ -2,7 +2,7 @@
   "primary_model": "yolo11n.pt",
   "fallback_model": "yolov8n.pt",
   "model_name": "yolo11n.pt",
-  "detection_confidence": 0.45,
+  "detection_confidence": 0.35,
   "iou_threshold": 0.45,
   "input_size": 640,
   "frame_skip": 1,

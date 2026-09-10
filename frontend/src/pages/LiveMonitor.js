@@ -17,12 +17,16 @@ import {
     Shuffle,
     ShoppingBag,
     Inbox,
-    AlertCircle
+    AlertCircle,
+    Cpu,
+    Bug
 } from "lucide-react";
 
 function LiveMonitor() {
     const [events, setEvents] = useState([]);
     const [connected, setConnected] = useState(false);
+    const [debugMode, setDebugMode] = useState(false);
+    const [currentDetections, setCurrentDetections] = useState([]);
     const [cameraOn, setCameraOn] = useState(false);
     const [cameraError, setCameraError] = useState("");
     const [scanning, setScanning] = useState(false);
@@ -66,46 +70,88 @@ function LiveMonitor() {
         }
     }, []);
 
-    // ── WebSocket ──────────────────────────────────────────
-    const connectWS = useCallback(() => {
-        try {
-            const ws = new WebSocket(WS_URL);
-            ws.onopen = () => setConnected(true);
-            ws.onerror = () => ws.close();
-            ws.onmessage = (msg) => {
-                try {
-                    const data = JSON.parse(msg.data);
-                    if (data.type === "pong") return;
-                    setEvents((prev) => {
-                        const newEvent = { ...data, id: Date.now() + Math.random() };
-                        return [newEvent, ...prev].slice(0, 80);
-                    });
-                    // Refresh database inventory on verified event
-                    if (data.database_inventory !== undefined || data.type === "event") {
-                        loadProducts();
-                    }
-                } catch (_) { }
-            };
-            ws.onclose = () => {
-                setConnected(false);
-                setTimeout(connectWS, 3000);
-            };
-            wsRef.current = ws;
-            const ping = setInterval(() => {
-                if (ws.readyState === WebSocket.OPEN) ws.send("ping");
-            }, 15000);
-            ws.addEventListener("close", () => clearInterval(ping));
-        } catch (err) { console.error("WS:", err); }
-    }, [WS_URL, loadProducts]);
-
+    // ── WebSocket & Initialization ────────────────────────
     useEffect(() => {
-        connectWS();
+        let isDisposed = false;
+        let retryTimer = null;
+        let pingTimer = null;
+        let ws = null;
+
+        const connect = () => {
+            if (isDisposed) return;
+            try {
+                ws = new WebSocket(WS_URL);
+                wsRef.current = ws;
+
+                ws.onopen = () => {
+                    if (isDisposed) {
+                        try { ws.close(1000, "Clean unmount"); } catch (_) {}
+                        return;
+                    }
+                    setConnected(true);
+                };
+
+                ws.onmessage = (msg) => {
+                    if (isDisposed) return;
+                    try {
+                        const data = JSON.parse(msg.data);
+                        if (data.type === "pong") return;
+                        setEvents((prev) => {
+                            const newEvent = { ...data, id: Date.now() + Math.random() };
+                            return [newEvent, ...prev].slice(0, 80);
+                        });
+                        // Refresh database inventory on verified event
+                        if (data.database_inventory !== undefined || data.type === "event") {
+                            loadProducts();
+                        }
+                    } catch (_) { }
+                };
+
+                ws.onclose = () => {
+                    if (!isDisposed) {
+                        setConnected(false);
+                        retryTimer = setTimeout(connect, 3000);
+                    }
+                };
+
+                ws.onerror = () => {
+                    // Avoid triggering premature close during connection handshake
+                };
+
+                pingTimer = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send("ping");
+                    }
+                }, 15000);
+            } catch (err) {
+                if (!isDisposed) {
+                    retryTimer = setTimeout(connect, 3000);
+                }
+            }
+        };
+
+        connect();
         loadProducts();
+
         return () => {
-            wsRef.current?.close();
+            isDisposed = true;
+            if (retryTimer) clearTimeout(retryTimer);
+            if (pingTimer) clearInterval(pingTimer);
+            if (ws) {
+                ws.onclose = null;
+                ws.onerror = null;
+                ws.onmessage = null;
+                if (ws.readyState === WebSocket.OPEN) {
+                    try { ws.close(1000, "Clean unmount"); } catch (_) {}
+                } else if (ws.readyState === WebSocket.CONNECTING) {
+                    ws.onopen = () => {
+                        try { ws.close(1000, "Clean unmount"); } catch (_) {}
+                    };
+                }
+            }
             stopCamera();
         };
-    }, [connectWS, loadProducts]);
+    }, [WS_URL, loadProducts]);
 
     // ── Camera Management ──────────────────────────────────
     const startCamera = async () => {
@@ -221,15 +267,32 @@ function LiveMonitor() {
             ctx.setLineDash([]);
 
             // Label tag with Tracking ID and Confidence
-            const labelText = isPerson
+            let labelText = isPerson
                 ? `Person #${obj.track_id} (${Math.round(obj.confidence * 100)}%)`
-                : `${obj.label} #${obj.track_id} (${Math.round(obj.confidence * 100)}%)`;
+                : `${obj.display_name || obj.label} #${obj.track_id} (${Math.round(obj.confidence * 100)}%)`;
+
+            if (debugMode) {
+                labelText = `[CID:${obj.class_id ?? '?'}] ${obj.display_name || obj.label} #${obj.track_id} (${Math.round(obj.confidence * 100)}%)`;
+            }
 
             ctx.fillStyle = color;
             ctx.fillRect(x1, y1 - 20, Math.max(90, labelText.length * 6.5), 18);
             ctx.fillStyle = "#ffffff";
             ctx.font = "bold 10px Inter, sans-serif";
             ctx.fillText(labelText, x1 + 5, y1 - 6);
+
+            // Developer Debug coordinates & area ratio tag
+            if (debugMode) {
+                const bw = Math.round(x2 - x1);
+                const bh = Math.round(y2 - y1);
+                const relArea = Math.round((bw * bh) / (canvas.width * canvas.height) * 100);
+                const coordTag = `[${Math.round(x1)},${Math.round(y1)},${bw}x${bh}] (${relArea}% Area)`;
+                ctx.fillStyle = "rgba(15,23,42,0.92)";
+                ctx.fillRect(x1, y1 - 36, Math.max(110, coordTag.length * 5.8), 14);
+                ctx.fillStyle = "#38BDF8";
+                ctx.font = "9px monospace";
+                ctx.fillText(coordTag, x1 + 4, y1 - 25);
+            }
 
             // State Machine pill below bounding box for products
             if (!isPerson) {
@@ -325,6 +388,7 @@ function LiveMonitor() {
 
             // Draw bounding boxes, shelf ROIs, tracking IDs on overlay canvas
             renderVisualOverlays(res.data, canvas.width, canvas.height);
+            setCurrentDetections(res.data.tracked_objects || []);
 
             // Log new events
             if (res.data.events && res.data.events.length > 0) {
@@ -616,6 +680,22 @@ function LiveMonitor() {
                                         {autoScan ? <Square size={14} /> : <Play size={14} />}
                                         <span>{autoScan ? `Stop Continuous (${scanInterval}s)` : "Continuous Auto Scan"}</span>
                                     </button>
+                                    <button
+                                        className="btn btn-sm"
+                                        onClick={() => setDebugMode(!debugMode)}
+                                        style={{
+                                            background: debugMode ? "rgba(99, 102, 241, 0.2)" : "var(--surface-bg)",
+                                            borderColor: debugMode ? "var(--primary)" : "var(--border-color)",
+                                            color: debugMode ? "var(--primary)" : "var(--text-secondary)",
+                                            fontWeight: debugMode ? 600 : 500,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 6
+                                        }}
+                                    >
+                                        <Bug size={14} />
+                                        <span>{debugMode ? "Debug: ON" : "Debug: OFF"}</span>
+                                    </button>
                                     <button className="btn btn-outline-danger btn-sm" onClick={stopCamera}>
                                         Stop Feed
                                     </button>
@@ -649,8 +729,78 @@ function LiveMonitor() {
                         )}
                     </div>
 
+                    {/* Developer Debug Telemetry Panel */}
+                    {debugMode && (
+                        <div className="card" style={{ marginTop: 16, border: "1px solid var(--primary-border)", background: "rgba(15, 23, 42, 0.6)" }}>
+                            <div className="card-header" style={{ paddingBottom: 8 }}>
+                                <div className="card-title" style={{ margin: 0, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 8 }}>
+                                    <Cpu size={16} style={{ color: "var(--primary)" }} />
+                                    <span>Developer Diagnostic Mode — Active Telemetry</span>
+                                </div>
+                                <span style={{ fontSize: "0.75rem", padding: "2px 8px", background: "var(--primary-subtle)", color: "var(--primary)", borderRadius: 4, fontWeight: 600 }}>
+                                    {aiStats.model_name}
+                                </span>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
+                                <div style={{ background: "var(--surface-bg)", padding: 8, borderRadius: 6, border: "1px solid var(--border-color)" }}>
+                                    <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Inference Time</div>
+                                    <div style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text-primary)" }}>{aiStats.latency_ms} ms</div>
+                                </div>
+                                <div style={{ background: "var(--surface-bg)", padding: 8, borderRadius: 6, border: "1px solid var(--border-color)" }}>
+                                    <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Framerate</div>
+                                    <div style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--success)" }}>{aiStats.fps} FPS</div>
+                                </div>
+                                <div style={{ background: "var(--surface-bg)", padding: 8, borderRadius: 6, border: "1px solid var(--border-color)" }}>
+                                    <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Hardware Device</div>
+                                    <div style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--primary)" }}>{aiStats.device}</div>
+                                </div>
+                                <div style={{ background: "var(--surface-bg)", padding: 8, borderRadius: 6, border: "1px solid var(--border-color)" }}>
+                                    <div style={{ fontSize: "0.6875rem", color: "var(--text-muted)", textTransform: "uppercase" }}>Active Tracks</div>
+                                    <div style={{ fontSize: "1.125rem", fontWeight: 700, color: "#F59E0B" }}>{aiStats.tracked_count}</div>
+                                </div>
+                            </div>
+
+                            <div style={{ fontSize: "0.8125rem", fontWeight: 600, marginBottom: 6, color: "var(--text-primary)" }}>
+                                Current Object Detections ({currentDetections.length})
+                            </div>
+                            {currentDetections.length === 0 ? (
+                                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontStyle: "italic", padding: "8px 0" }}>
+                                    No objects currently detected in view (scene clear).
+                                </div>
+                            ) : (
+                                <div style={{ overflowX: "auto" }}>
+                                    <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
+                                        <thead>
+                                            <tr style={{ borderBottom: "1px solid var(--border-color)", textAlign: "left", color: "var(--text-muted)" }}>
+                                                <th style={{ padding: "6px 8px" }}>Track ID</th>
+                                                <th style={{ padding: "6px 8px" }}>Class ID</th>
+                                                <th style={{ padding: "6px 8px" }}>Class Name</th>
+                                                <th style={{ padding: "6px 8px" }}>Category</th>
+                                                <th style={{ padding: "6px 8px" }}>Confidence</th>
+                                                <th style={{ padding: "6px 8px" }}>Bounding Box [x1, y1, x2, y2]</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentDetections.map((d, i) => (
+                                                <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                                                    <td style={{ padding: "6px 8px", fontWeight: 600, color: "#38BDF8" }}>#{d.track_id}</td>
+                                                    <td style={{ padding: "6px 8px", color: "var(--text-muted)" }}>{d.class_id ?? "—"}</td>
+                                                    <td style={{ padding: "6px 8px", fontWeight: 600, color: d.category === "person" ? "#67E8F9" : "var(--primary)" }}>{d.display_name || d.label}</td>
+                                                    <td style={{ padding: "6px 8px" }}><span style={{ textTransform: "uppercase", fontSize: "0.6875rem", padding: "1px 5px", borderRadius: 3, background: d.category === "uncertain" ? "rgba(245,158,11,0.2)" : "rgba(99,102,241,0.2)", color: d.category === "uncertain" ? "#F59E0B" : "var(--primary)" }}>{d.category}</span></td>
+                                                    <td style={{ padding: "6px 8px", fontWeight: 600 }}>{Math.round(d.confidence * 100)}%</td>
+                                                    <td style={{ padding: "6px 8px", fontFamily: "monospace", color: "var(--text-muted)" }}>[{d.box ? d.box.join(", ") : ""}]</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Calibrated Demo Scenarios */}
                     <div className="card">
+
                         <div className="card-header">
                             <div className="card-title" style={{ margin: 0 }}>
                                 <Sparkles size={15} style={{ color: "var(--primary)" }} />

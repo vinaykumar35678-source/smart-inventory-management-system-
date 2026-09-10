@@ -12,14 +12,44 @@ from collections import Counter
 _model           = None
 _simulation_mode = False
 
-# Use custom trained model if available, otherwise fallback to ONNX or PT
-if os.path.exists("runs/detect/smart_shelf_model/weights/best.pt"):
-    YOLO_MODEL_PATH = "runs/detect/smart_shelf_model/weights/best.pt"
-elif os.path.exists("yolo11n.onnx"):
-    YOLO_MODEL_PATH = "yolo11n.onnx"
-else:
-    YOLO_MODEL_PATH = "yolo11n.pt"
+_CURR_DIR = os.path.dirname(os.path.abspath(__file__))
+_ROOT_DIR = os.path.dirname(_CURR_DIR)
 
+
+def _get_best_model_path():
+    # 1. Check active_model.json if configured
+    active_json = os.path.join(_ROOT_DIR, "ml", "models", "active_model.json")
+    if os.path.exists(active_json):
+        try:
+            import json
+            with open(active_json, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                m_path = data.get("model_path")
+                if m_path and os.path.exists(m_path):
+                    return m_path
+        except Exception:
+            pass
+
+    # 2. Check candidate model paths
+    candidates = [
+        os.path.join(_ROOT_DIR, "ml", "models", "yolo11_smartshelf_pen_lays_bisc", "best.pt"),
+        os.path.join(_ROOT_DIR, "runs", "train", "yolo11_smartshelf_pen_lays_bisc", "weights", "best.pt"),
+        os.path.join(_CURR_DIR, "runs", "detect", "smart_shelf_model", "weights", "best.pt"),
+        os.path.join(_ROOT_DIR, "runs", "detect", "smart_shelf_model", "weights", "best.pt"),
+        os.path.join(_CURR_DIR, "yolo11n.onnx"),
+        os.path.join(_ROOT_DIR, "yolo11n.onnx"),
+        os.path.join(_CURR_DIR, "yolo11n.pt"),
+        os.path.join(_ROOT_DIR, "yolo11n.pt"),
+        os.path.join(_CURR_DIR, "yolov8n.pt"),
+        os.path.join(_ROOT_DIR, "yolov8n.pt"),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "yolo11n.pt"
+
+
+YOLO_MODEL_PATH = _get_best_model_path()
 CONFIDENCE_THRESHOLD  = 0.15
 
 
@@ -27,9 +57,9 @@ def _load_model():
     global _model, _simulation_mode
     try:
         from ultralytics import YOLO
-        _model           = YOLO(YOLO_MODEL_PATH)
+        _model = YOLO(YOLO_MODEL_PATH)
         _simulation_mode = False
-        print("[Detection] YOLO11 loaded — real detection active.")
+        print(f"[Detection] YOLO loaded ({os.path.basename(YOLO_MODEL_PATH)}) — real detection active.")
     except Exception as exc:
         print(f"[Detection] YOLO unavailable ({exc}). Simulation mode ON.")
         _simulation_mode = True
@@ -41,7 +71,7 @@ _load_model()
 # ── Class handling ────────────────────────────────────
 _SIM_ITEMS = [
     "Apple", "Banana", "Milk", "Bread",
-    "Water Bottle", "Lays", "Biscuits", "Mobile",
+    "Water Bottle", "Lays", "Biscuits", "Cell Phone",
     "Chair", "Table", "Book", "Pen", "ID Card"
 ]
 
@@ -121,17 +151,29 @@ def detect_from_frame(frame) -> list:
             xyxy   = [int(x) for x in box.xyxy[0].tolist()]
             track_id = int(box.id[0]) if box.id is not None else None
 
-            raw_label = _model.names.get(cls_id, f"object_{cls_id}")
+            raw_label = _model.names.get(cls_id, f"object_{cls_id}") if hasattr(_model, "names") else f"object_{cls_id}"
+            norm_label = raw_label.lower().replace("_", " ").strip()
+
+            if norm_label in ["cell phone", "cellphone", "mobile phone", "mobile"]:
+                final_label = "Cell Phone"
+            elif "biscuit" in norm_label:
+                final_label = "Biscuits"
+            elif "lays" in norm_label:
+                final_label = "Lays"
+            elif "pen" in norm_label:
+                final_label = "Pen"
+            else:
+                final_label = raw_label.replace("_", " ").title()
+
             # Identify person class robustly regardless of model
-            if raw_label.lower() == "person":
+            if norm_label == "person":
                 detected.append({"label": "Person",
                                   "confidence": round(conf, 3),
                                   "category": "person",
                                   "box": xyxy,
                                   "track_id": track_id})
             else:
-                # Custom models might use underscores, title format looks better
-                detected.append({"label": raw_label.replace("_", " ").title(),
+                detected.append({"label": final_label,
                                   "confidence": round(conf, 3),
                                   "category": "item",
                                   "box": xyxy,

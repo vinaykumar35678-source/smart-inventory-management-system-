@@ -6,8 +6,25 @@ import cv2
 import os
 import sys
 
-def run_inference(source=0, weights="yolov8n.pt", conf=0.45):
+def get_default_weights():
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "ml", "models", "yolo11_smartshelf_pen_lays_bisc", "best.pt"),
+        os.path.join(os.path.dirname(__file__), "runs", "train", "yolo11_smartshelf_pen_lays_bisc", "weights", "best.pt"),
+        os.path.join(os.path.dirname(__file__), "smart_shelf", "runs", "detect", "smart_shelf_model", "weights", "best.pt"),
+        "yolo11n.pt",
+        "yolov8n.pt",
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return "yolo11n.pt"
+
+
+def run_inference(source=0, weights=None, conf=0.45):
     from ultralytics import YOLO
+
+    if weights is None or not os.path.exists(weights):
+        weights = get_default_weights()
 
     print(f"Loading weights from {weights}...")
     model = YOLO(weights)

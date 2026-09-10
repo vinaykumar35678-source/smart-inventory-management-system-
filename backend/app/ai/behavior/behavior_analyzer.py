@@ -54,9 +54,9 @@ class BehaviorAnalyzer:
         suspicious_score_thresh = int(ai_config.get("suspicious_score_threshold", 70))
         min_move_dist = float(ai_config.get("min_movement_distance", 30.0))
 
-        # Separate persons and items
+        # Separate persons and validated inventory items
         persons = [o for o in tracked_objects if o.get("category") == "person"]
-        items = [o for o in tracked_objects if o.get("category") != "person"]
+        items = [o for o in tracked_objects if o.get("category") == "item"]
 
         # Map shelf contents by track_id
         items_inside_shelves = {}

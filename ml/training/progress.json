@@ -1,0 +1,18 @@
+{
+  "status": "TRAINING",
+  "model_name": "yolo11_smartshelf_v2",
+  "base_model": "yolo11n.pt",
+  "dataset": "merged_retail_inventory",
+  "current_epoch": 5,
+  "total_epochs": 20,
+  "device": "CPU",
+  "device_name": "CPU",
+  "num_classes": 18,
+  "loss": 17.0123,
+  "precision": 0.515,
+  "recall": 0.7623,
+  "map50": 0.721,
+  "map50_95": 0.5978,
+  "message": "Epoch 5/20 completed \u2014 mAP50: 0.7210",
+  "last_updated": "2026-09-07T07:42:08.863674"
+}

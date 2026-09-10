@@ -559,6 +559,7 @@ async def detect_webcam_frame(
     import asyncio, cv2
     from concurrent.futures import ThreadPoolExecutor
     from .ai.pipeline import pipeline
+    from .ai.detection.detector import detector
 
     # ── Decode image ────────────────────────────────────────
     try:
@@ -649,11 +650,26 @@ async def detect_webcam_frame(
         "fps": cv_res.get("fps", 0.0),
         "latency_ms": cv_res.get("latency_ms", 0.0),
         "device": cv_res.get("device", "CPU"),
-        "model_name": cv_res.get("model_name", "YOLO")
+        "model_name": cv_res.get("model_name", "YOLO"),
+        "active_model": detector.get_info()
     }
 
 
+# ── AI Model Status & Diagnostics ──────────────────────────────────────────────
+
+@router.get("/ai/model-status")
+@router.get("/ai/diagnostics")
+def get_ai_model_diagnostics(_user: models.User = Depends(get_current_user)):
+    """
+    Diagnostic endpoint providing active model path, version, authoritative class mappings,
+    and anti-hallucination settings.
+    """
+    from .ai.detection.detector import detector
+    return detector.get_diagnostics()
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
+
 
 
 @router.get("/products", response_model=List[schemas.ProductResponse])
@@ -775,23 +791,13 @@ def trigger_simulation(
     db: Session = Depends(get_db),
     _user: models.User = Depends(get_current_user),
 ):
-    detected = simulate_detection()
+    detected = simulate_detection(db)
     results = []
     for product_name, info in detected.items():
         qty = info.get("quantity", 1)
         conf = info.get("confidence", 0.95)
-        product = db.query(models.Product).filter(models.Product.name == product_name).first()
-        if product:
-            result = process_removal(product_name, qty, conf, db)
-            results.append(result)
-        else:
-            event = models.Event(product_name=product_name, quantity_removed=qty, confidence=conf)
-            db.add(event)
-            db.commit()
-            results.append({
-                "type": "removal", "product": product_name, "quantity": qty,
-                "confidence": conf, "timestamp": datetime.utcnow().isoformat(), "stock": None
-            })
+        result = process_removal(product_name, qty, conf, db)
+        results.append(result)
     return {"detected": results}
 
 

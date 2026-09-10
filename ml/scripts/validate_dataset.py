@@ -135,10 +135,15 @@ def validate_yolo_dataset(dataset_dir: str = MERGED_DIR, yaml_path: Optional[str
                     lines = [l.strip() for l in lf if l.strip()]
 
                 if not lines:
-                    report["issues"]["empty_labels"].append(f"{split}/{fname}")
-                    report["summary"]["empty_labels"] += 1
+                    # Valid YOLO negative/background image (e.g. hard negative background)
+                    if "hard_negative" in fname or "negative" in fname or "empty" in fname:
+                        report["summary"]["background_images"] = report["summary"].get("background_images", 0) + 1
+                    else:
+                        report["issues"]["empty_labels"].append(f"{split}/{fname}")
+                        report["summary"]["empty_labels"] += 1
                     continue
 
+                img_classes_in_file = set()
                 for line_no, line in enumerate(lines, 1):
                     tokens = line.split()
                     if len(tokens) < 5:
@@ -168,21 +173,42 @@ def validate_yolo_dataset(dataset_dir: str = MERGED_DIR, yaml_path: Optional[str
                         cname = declared_classes.get(cid, f"Class_{cid}")
                         report["class_distribution"][cname] += 1
                         report["summary"]["valid_annotations"] += 1
+                        img_classes_in_file.add(cname)
 
                     except ValueError:
                         report["issues"]["invalid_annotations"].append(f"{split}/{fname}:{line_no} non-numeric values")
                         report["summary"]["invalid_boxes"] += 1
+
+                if not hasattr(report, "class_image_distribution"):
+                    if "class_image_distribution" not in report:
+                        report["class_image_distribution"] = defaultdict(int)
+                for cn in img_classes_in_file:
+                    report["class_image_distribution"][cn] += 1
+
             except Exception as e:
                 report["issues"]["empty_labels"].append(f"{split}/{fname} read error: {e}")
 
-    # Generate sample previews (first 6 samples from train)
+    # Generate targeted sample previews for key products: Biscuit, Pen, Lays, Cell Phone / Mobile, and Background
     train_img_dir = os.path.join(dataset_dir, "images", "train")
     train_lbl_dir = os.path.join(dataset_dir, "labels", "train")
+    previews_dir = os.path.join(dataset_dir, "previews")
+    os.makedirs(previews_dir, exist_ok=True)
+
+    target_classes = ["Lays", "Biscuits", "Mobile", "Pen", "hard_negative"]
+    selected_samples = []
+
     if os.path.exists(train_img_dir):
-        samples = [f for f in os.listdir(train_img_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))][:6]
+        all_imgs = os.listdir(train_img_dir)
+        for tc in target_classes:
+            matching = [f for f in all_imgs if tc.lower() in f.lower()]
+            if not matching and tc == "Mobile":
+                matching = [f for f in all_imgs if "cellphone" in f.lower() or "mobile" in f.lower()]
+            if matching:
+                selected_samples.extend(matching[:2])
+
         colors = [(99, 102, 241), (6, 182, 212), (16, 185, 129), (245, 158, 11), (239, 68, 68), (168, 85, 247)]
 
-        for sname in samples:
+        for sname in selected_samples:
             ipath = os.path.join(train_img_dir, sname)
             lpath = os.path.join(train_lbl_dir, os.path.splitext(sname)[0] + ".txt")
             im = cv2.imread(ipath)
@@ -202,20 +228,25 @@ def validate_yolo_dataset(dataset_dir: str = MERGED_DIR, yaml_path: Optional[str
                                 y1 = max(0, int((yc - bh/2) * h))
                                 x2 = min(w, int((xc + bw/2) * w))
                                 y2 = min(h, int((yc + bh/2) * h))
-                                col = colors[cid % len(colors)]
-                                cv2.rectangle(im, (x1, y1), (x2, y2), col, 2)
-                                lbl_txt = f"{declared_classes.get(cid, cid)}"
-                                cv2.putText(im, lbl_txt, (x1 + 4, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 2)
+                                col = (0, 255, 0) if cid == 12 else colors[cid % len(colors)]
+                                cv2.rectangle(im, (x1, y1), (x2, y2), col, 3)
+                                lbl_txt = f"{declared_classes.get(cid, cid).upper()}"
+                                cv2.putText(im, lbl_txt, (x1 + 4, max(22, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.65, col, 2)
                                 box_count += 1
                             except Exception:
                                 pass
 
-            # Resize to max 400px width
-            if w > 400:
-                scale = 400 / w
-                im = cv2.resize(im, (400, int(h * scale)))
+            # Save visual preview image for inspection
+            cv2.imwrite(os.path.join(previews_dir, f"preview_{sname}"), im)
 
-            _, buf = cv2.imencode(".jpg", im, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            # Resize to max 400px width for HTML report
+            thumb = im.copy()
+            if w > 400:
+                scale = 400.0 / float(max(1, w))
+                new_h = max(1, int(round(h * scale)))
+                thumb = cv2.resize(thumb, (400, new_h))
+
+            _, buf = cv2.imencode(".jpg", thumb, [cv2.IMWRITE_JPEG_QUALITY, 80])
             b64 = base64.b64encode(buf).decode("utf-8")
             report["sample_previews"].append({
                 "filename": sname,
@@ -389,11 +420,27 @@ def generate_html_report(report: Dict[str, Any], output_path: str = REPORT_HTML_
 
 if __name__ == "__main__":
     rep = validate_yolo_dataset()
-    generate_html_report(rep)
-    print(f"\n[OK] Dataset Validation Summary:")
+    print(f"\n==========================================================================")
+    print(f"CLASS DISTRIBUTION REPORT (Images vs. Objects)")
+    print(f"==========================================================================")
+    print(f"{'Class':<20} | {'Number of Images':<18} | {'Number of Objects':<18}")
+    print(f"--------------------------------------------------------------------------")
+    for cid, cname in rep['declared_classes'].items():
+        objs = rep['class_distribution'].get(cname, 0)
+        imgs = rep.get('class_image_distribution', {}).get(cname, 0)
+        marker = " <== TARGET" if cname in ["Lays", "Biscuits", "Mobile", "Pen"] else ""
+        print(f"{cname:<20} | {imgs:<18} | {objs:<18}{marker}")
+    print(f"--------------------------------------------------------------------------")
+    bg_imgs = rep['summary'].get('background_images', 0)
+    print(f"{'Background (Hard Negatives)':<20} | {bg_imgs:<18} | {0:<18}")
+    print(f"==========================================================================\n")
+
+    print(f"[OK] Dataset Validation Summary:")
     print(f"  Total Images:       {rep['summary']['total_images']}")
     print(f"  Valid Images:       {rep['summary']['valid_images']}")
     print(f"  Valid Annotations:  {rep['summary']['valid_annotations']}")
     print(f"  Corrupted Images:   {rep['summary']['corrupted_images']}")
     print(f"  Invalid Bounding:   {rep['summary']['invalid_boxes']}")
+    print(f"  Background Images:  {bg_imgs}")
     print(f"  Validation Status:  {'READY FOR TRAINING' if rep['is_valid'] else 'ISSUES FOUND'}")
+

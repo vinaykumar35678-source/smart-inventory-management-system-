@@ -143,58 +143,92 @@ function Dashboard() {
   useEffect(() => {
     const host = window.location.hostname || "localhost";
     const WS_URL = `ws://${host}:8000/ws`;
-    let ws;
-    let retryTimer;
+    let ws = null;
+    let retryTimer = null;
+    let isDisposed = false;
 
     const connect = () => {
-      ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
+      if (isDisposed) return;
+      try {
+        ws = new WebSocket(WS_URL);
+        wsRef.current = ws;
 
-      ws.onmessage = (evt) => {
-        try {
-          const msg = JSON.parse(evt.data);
+        ws.onopen = () => {
+          if (isDisposed) {
+            try { ws.close(1000, "Clean unmount"); } catch (_) {}
+          }
+        };
 
-          if (msg.type === "removal" || msg.type === "addition") {
-            const isAddition = msg.type === "addition";
-            // Instantly update product stock
-            setProducts((prev) =>
-              prev.map((p) =>
-                p.name === msg.product
-                  ? { ...p, stock: msg.stock ?? Math.max(0, p.stock + (isAddition ? 1 : -1)) }
-                  : p
-              )
-            );
-            // Refresh stats and events
-            api.get("/events?limit=20").then((r) => setEvents(r.data)).catch(() => { });
-            api.get("/stats").then((r) => setStats(r.data)).catch(() => { });
+        ws.onmessage = (evt) => {
+          if (isDisposed) return;
+          try {
+            const msg = JSON.parse(evt.data);
 
-            if (isAddition) {
-              addToast({ type: "success", icon: CheckCircle2, body: `${msg.product} restocked: ${msg.stock ?? "?"} units` });
-            } else {
-              addToast({ type: "info", icon: Info, body: `${msg.product} removed: ${msg.stock ?? "?"} remaining` });
+            if (msg.type === "removal" || msg.type === "addition") {
+              const isAddition = msg.type === "addition";
+              // Instantly update product stock
+              setProducts((prev) =>
+                prev.map((p) =>
+                  p.name === msg.product
+                    ? { ...p, stock: msg.stock ?? Math.max(0, p.stock + (isAddition ? 1 : -1)) }
+                    : p
+                )
+              );
+              // Refresh stats and events
+              api.get("/events?limit=20").then((r) => setEvents(r.data)).catch(() => { });
+              api.get("/stats").then((r) => setStats(r.data)).catch(() => { });
+
+              if (isAddition) {
+                addToast({ type: "success", icon: CheckCircle2, body: `${msg.product} restocked: ${msg.stock ?? "?"} units` });
+              } else {
+                addToast({ type: "info", icon: Info, body: `${msg.product} removed: ${msg.stock ?? "?"} remaining` });
+              }
             }
-          }
 
-          if (msg.type === "alert") {
-            api.get("/alerts").then((r) => setAlerts(r.data)).catch(() => { });
-            addToast({ type: "warning", icon: AlertTriangle, body: msg.message || `Low stock alert for ${msg.product}` });
-          }
+            if (msg.type === "alert") {
+              api.get("/alerts").then((r) => setAlerts(r.data)).catch(() => { });
+              addToast({ type: "warning", icon: AlertTriangle, body: msg.message || `Low stock alert for ${msg.product}` });
+            }
 
-          if (msg.type === "person") {
-            addToast({ type: "info", icon: Info, body: msg.message });
-          }
-        } catch (_) { }
-      };
+            if (msg.type === "person") {
+              addToast({ type: "info", icon: Info, body: msg.message });
+            }
+          } catch (_) { }
+        };
 
-      ws.onclose = () => { retryTimer = setTimeout(connect, 4000); };
-      ws.onerror = () => ws.close();
+        ws.onclose = () => {
+          if (!isDisposed) {
+            retryTimer = setTimeout(connect, 4000);
+          }
+        };
+
+        ws.onerror = () => {
+          // Avoid triggering premature close during connection handshake
+        };
+      } catch (_) {
+        if (!isDisposed) {
+          retryTimer = setTimeout(connect, 4000);
+        }
+      }
     };
 
     connect();
 
     return () => {
-      clearTimeout(retryTimer);
-      if (wsRef.current) wsRef.current.close();
+      isDisposed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (ws) {
+        ws.onclose = null;
+        ws.onerror = null;
+        ws.onmessage = null;
+        if (ws.readyState === WebSocket.OPEN) {
+          try { ws.close(1000, "Clean unmount"); } catch (_) {}
+        } else if (ws.readyState === WebSocket.CONNECTING) {
+          ws.onopen = () => {
+            try { ws.close(1000, "Clean unmount"); } catch (_) {}
+          };
+        }
+      }
     };
   }, [addToast]);
 

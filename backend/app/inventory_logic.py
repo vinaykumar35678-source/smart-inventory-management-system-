@@ -63,6 +63,47 @@ def _broadcast_safe(payload: dict):
         pass
 
 
+def find_product(db: Session, product_name: str) -> models.Product:
+    """Case-insensitive, whitespace-trimmed, and alias-aware product resolution."""
+    if not product_name:
+        return None
+    trimmed = product_name.strip()
+    # 1. Exact match
+    p = db.query(models.Product).filter(models.Product.name == trimmed).first()
+    if p:
+        return p
+    # 2. Case-insensitive match
+    p = db.query(models.Product).filter(models.Product.name.ilike(trimmed)).first()
+    if p:
+        return p
+    # 3. Known aliases
+    norm = trimmed.lower().replace("_", " ")
+    aliases = {
+        "mobile": ["mobile phone", "cell phone", "phone", "cellphone"],
+        "mobile phone": ["mobile", "cell phone", "phone", "cellphone"],
+        "cell phone": ["mobile phone", "mobile", "phone", "cellphone"],
+        "milk": ["milk (1l)", "milk (1 liter)"],
+        "milk (1l)": ["milk", "milk (1 liter)"],
+        "water bottle": ["bottle (water)", "bottle"],
+        "bottle": ["water bottle", "bottle (water)"],
+        "eggs": ["eggs (12)"],
+        "eggs (12)": ["eggs"],
+        "biscuit": ["biscuits"],
+        "biscuits": ["biscuit"],
+    }
+    for alias in aliases.get(norm, []):
+        p = db.query(models.Product).filter(models.Product.name.ilike(alias)).first()
+        if p:
+            return p
+    # 4. Substring contains match
+    all_prods = db.query(models.Product).all()
+    for prod in all_prods:
+        p_norm = prod.name.lower().strip()
+        if norm in p_norm or p_norm in norm:
+            return prod
+    return None
+
+
 def process_removal(product_name: str, quantity: int, confidence: float, db: Session):
     """
     Handle a detected removal:
@@ -72,9 +113,13 @@ def process_removal(product_name: str, quantity: int, confidence: float, db: Ses
     4. Broadcast via WebSocket (removal + optional alert)
     Returns the ws_payload dict for the API response.
     """
+    # ── Lookup product safely with aliases ─────────────────
+    product = find_product(db, product_name)
+    canonical_name = product.name if product else product_name
+
     # ── Log event ────────────────────────────────────────
     event = models.Event(
-        product_name=product_name,
+        product_name=canonical_name,
         quantity_removed=quantity,
         confidence=confidence,
         timestamp=datetime.utcnow()
@@ -82,10 +127,6 @@ def process_removal(product_name: str, quantity: int, confidence: float, db: Ses
     db.add(event)
 
     # ── Decrement stock ───────────────────────────────────
-    product = db.query(models.Product).filter(
-        models.Product.name == product_name
-    ).first()
-
     alert_data = None
     new_stock  = None
 
@@ -165,8 +206,11 @@ def process_addition(product_name: str, quantity: int, confidence: float, db: Se
     # ── Log event (using negative quantity to denote addition, or just a separate log)
     # Since our Event schema uses quantity_removed, we will use a negative value 
     # to represent additions, or we can use the message field.
+    product = find_product(db, product_name)
+    canonical_name = product.name if product else product_name
+
     event = models.Event(
-        product_name=product_name,
+        product_name=canonical_name,
         quantity_removed=-quantity,  # Negative means added
         confidence=confidence,
         timestamp=datetime.utcnow()
@@ -174,10 +218,6 @@ def process_addition(product_name: str, quantity: int, confidence: float, db: Se
     db.add(event)
 
     # ── Increment stock ───────────────────────────────────
-    product = db.query(models.Product).filter(
-        models.Product.name == product_name
-    ).first()
-
     new_stock = None
     if product:
         product.stock += quantity

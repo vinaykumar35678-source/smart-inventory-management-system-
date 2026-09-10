@@ -304,3 +304,5 @@ Timestamp,Product,Event_Type,Quantity,Current_Stock
 2026-09-02 06:37:19,Mobile Phone,REMOVAL,2,15
 2026-09-02 06:37:22,Clock,REMOVAL,1,0
 2026-09-02 06:37:24,Clock,ADDITION,1,1
+2026-09-07 05:16:12,Biscuits,ADDITION,5,30
+2026-09-07 05:16:12,Biscuits,REMOVAL,5,25

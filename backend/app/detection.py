@@ -21,25 +21,46 @@ _load_model()
 
 # ── Simulation pool ───────────────────────────────────────
 # Items that appear in simulation when YOLO isn't running.
-# Mix of groceries + stationery + electronics for the shop.
+# Mix of groceries + stationery + snacks for the shop.
 _SIM_ITEMS = [
     # Groceries
     "Apple", "Banana", "Milk (1L)", "Bread", "Eggs (12)",
-    "Bottle (Water)", "Orange", "Carrot", "Sandwich", "Cake",
-    # New shop items
-    "Mobile Phone", "Book", "Pen", "Paper Ream", "Calculator",
+    "Water Bottle", "Orange", "Carrot", "Coca Cola", "Pepsi", "Sprite",
+    # Snacks & Shop items
+    "Biscuits", "Lays", "Book", "Pen", "Paper Ream", "Calculator", "Mobile Phone", "Oreo", "KitKat"
 ]
 
 _SIM_PERSONS = ["Person detected near shelf"]
 
+EXCLUDED_CLASSES = {
+    "chair", "table", "dining table", "desk", "office chair", "tie", "necktie", "suit tie"
+}
+
 
 def _label_for_class(cls_id: int, model) -> tuple:
     """
-    Returns (category, display_label) for a class id from our custom YOLOv11 model.
+    Returns (category, display_label) for a class id from our YOLO model.
     category is either 'person' or 'item'.
     """
     raw = model.names.get(cls_id, f"object_{cls_id}")
-    if raw.lower() == "person":
+    norm_raw = raw.lower().replace("_", " ").strip()
+    if norm_raw in EXCLUDED_CLASSES:
+        return None, None
+    if norm_raw in ["cell phone", "cellphone", "mobile phone", "mobile"]:
+        return "item", "Mobile Phone"
+    if norm_raw in ["bottle", "water bottle"]:
+        return "item", "Water Bottle"
+    if norm_raw in ["milk", "milk (1l)"]:
+        return "item", "Milk (1L)"
+    if "egg" in norm_raw:
+        return "item", "Eggs (12)"
+    if "biscuit" in norm_raw:
+        return "item", "Biscuits"
+    if "lays" in norm_raw:
+        return "item", "Lays"
+    if "pen" in norm_raw:
+        return "item", "Pen"
+    if norm_raw == "person":
         return "person", "Person"
     return "item", raw.replace("_", " ").title()
 
@@ -79,6 +100,10 @@ def detect_from_frame(frame):
             cls_id = int(box.cls[0])
             conf   = float(box.conf[0])
             category, label = _label_for_class(cls_id, _model)
+            if category is None or label is None:
+                continue
+            if label.lower().strip() in EXCLUDED_CLASSES:
+                continue
             detected.append({"label": label, "confidence": round(conf, 3), "category": category})
     return detected
 
@@ -94,11 +119,22 @@ def detect_from_stream(stream_url: str):
     cap.release()
 
 
-def simulate_detection():
+def simulate_detection(db=None):
     """Simulate a single shelf-removal event for the /detect/simulate endpoint."""
-    if random.random() < 0.25:
-        return {}
-    item  = random.choice(_SIM_ITEMS)
-    qty   = random.randint(1, 3)
-    conf  = round(random.uniform(0.65, 0.99), 2)
+    item = None
+    if db is not None:
+        try:
+            from . import models
+            in_stock = db.query(models.Product).filter(models.Product.stock > 0).all()
+            if in_stock:
+                chosen = random.choice(in_stock)
+                item = chosen.name
+        except Exception:
+            pass
+
+    if not item:
+        item = random.choice(_SIM_ITEMS)
+
+    qty = random.randint(1, 2)
+    conf = round(random.uniform(0.75, 0.99), 2)
     return {item: {"quantity": qty, "confidence": conf}}

@@ -25,9 +25,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect if 401 happened on a protected route, NOT during a login attempt itself
+    // Only redirect if 401 happened on a protected data route, NOT during a login attempt or initial auth check
     const isLoginEndpoint = error.config && error.config.url && error.config.url.includes("/auth/login");
-    if (error.response && error.response.status === 401 && !isLoginEndpoint) {
+    const isMeEndpoint = error.config && error.config.url && error.config.url.includes("/auth/me");
+    if (error.response && error.response.status === 401 && !isLoginEndpoint && !isMeEndpoint) {
       localStorage.removeItem("smartshelf_token");
       localStorage.removeItem("smartshelf_user");
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {

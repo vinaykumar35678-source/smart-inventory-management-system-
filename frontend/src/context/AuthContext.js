@@ -15,6 +15,15 @@ export function AuthProvider({ children }) {
             const storedUser = localStorage.getItem("smartshelf_user");
             const token = localStorage.getItem("smartshelf_token");
 
+            // If no token exists, user is unauthenticated - do not trigger 401 on /auth/me
+            if (!token) {
+                if (isMounted) {
+                    setUser(null);
+                    setLoading(false);
+                }
+                return;
+            }
+
             if (storedUser) {
                 try {
                     setUser(JSON.parse(storedUser));
@@ -23,9 +32,7 @@ export function AuthProvider({ children }) {
                 }
             }
 
-            if (token) {
-                api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-            }
+            api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
             try {
                 // Verify session with server (uses cookie or Bearer header)

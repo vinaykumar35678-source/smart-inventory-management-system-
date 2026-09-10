@@ -64,6 +64,7 @@ def seed():
                 Product(name="Coca Cola",      stock=24, threshold=6,  price=40.00, category="Beverages",    image_url="🥤"),
                 # Snacks & Personal Care
                 Product(name="Lays Chips",     stock=50, threshold=15, price=20.00, category="Food",         image_url="🥔"),
+                Product(name="Biscuits",       stock=25, threshold=5,  price=20.00, category="Snacks",       image_url="🍪"),
                 Product(name="Shampoo",        stock=20, threshold=5,  price=150.00, category="Personal Care",image_url="🧴"),
                 Product(name="Toothpaste",     stock=30, threshold=8,  price=60.00,  category="Personal Care",image_url="🪥"),
                 Product(name="Soap",           stock=45, threshold=10, price=45.00,  category="Personal Care",image_url="🧼"),

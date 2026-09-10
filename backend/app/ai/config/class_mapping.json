@@ -1,0 +1,214 @@
+{
+  "version": "2.0.0",
+  "description": "Authoritative Single-Source-of-Truth Class Mapping for SmartShelf",
+  "classes": {
+    "0": {
+      "yolo_class_id": 0,
+      "model_class_name": "Apple",
+      "db_product_name": "Apple",
+      "db_product_id": 1,
+      "display_name": "Apple",
+      "category": "item",
+      "aliases": ["apple", "fresh apple", "red apple"]
+    },
+    "1": {
+      "yolo_class_id": 1,
+      "model_class_name": "Banana",
+      "db_product_name": "Banana",
+      "db_product_id": 2,
+      "display_name": "Banana",
+      "category": "item",
+      "aliases": ["banana", "bananas", "yellow banana"]
+    },
+    "2": {
+      "yolo_class_id": 2,
+      "model_class_name": "Milk",
+      "db_product_name": "Milk (1L)",
+      "db_product_id": 3,
+      "display_name": "Milk (1L)",
+      "category": "item",
+      "aliases": ["milk", "milk (1l)", "milk 1l", "dairy milk"]
+    },
+    "3": {
+      "yolo_class_id": 3,
+      "model_class_name": "Water Bottle",
+      "db_product_name": "Water Bottle",
+      "db_product_id": 25,
+      "display_name": "Water Bottle",
+      "category": "item",
+      "aliases": ["water bottle", "bottle", "mineral water"]
+    },
+    "4": {
+      "yolo_class_id": 4,
+      "model_class_name": "Bread",
+      "db_product_name": "Bread",
+      "db_product_id": 26,
+      "display_name": "Bread",
+      "category": "item",
+      "aliases": ["bread", "white bread", "brown bread"]
+    },
+    "5": {
+      "yolo_class_id": 5,
+      "model_class_name": "Lays",
+      "db_product_name": "Lays",
+      "db_product_id": 16,
+      "display_name": "Lays Chips",
+      "category": "item",
+      "aliases": ["lays", "lays chips", "potato chips"]
+    },
+    "6": {
+      "yolo_class_id": 6,
+      "model_class_name": "Biscuits",
+      "db_product_name": "Biscuits",
+      "db_product_id": 17,
+      "display_name": "Biscuits",
+      "category": "item",
+      "aliases": ["biscuits", "biscuit", "cookies"]
+    },
+    "7": {
+      "yolo_class_id": 7,
+      "model_class_name": "Coca Cola",
+      "db_product_name": "Coca Cola",
+      "db_product_id": 27,
+      "display_name": "Coca Cola",
+      "category": "item",
+      "aliases": ["coca cola", "coke", "coca-cola"]
+    },
+    "8": {
+      "yolo_class_id": 8,
+      "model_class_name": "Pepsi",
+      "db_product_name": "Pepsi",
+      "db_product_id": 28,
+      "display_name": "Pepsi",
+      "category": "item",
+      "aliases": ["pepsi", "pepsi can", "pepsi cola"]
+    },
+    "9": {
+      "yolo_class_id": 9,
+      "model_class_name": "Sprite",
+      "db_product_name": "Sprite",
+      "db_product_id": 29,
+      "display_name": "Sprite",
+      "category": "item",
+      "aliases": ["sprite", "sprite can"]
+    },
+    "10": {
+      "yolo_class_id": 10,
+      "model_class_name": "Oreo",
+      "db_product_name": "Oreo",
+      "db_product_id": 23,
+      "display_name": "Oreo",
+      "category": "item",
+      "aliases": ["oreo", "oreo biscuits", "oreo cookies"]
+    },
+    "11": {
+      "yolo_class_id": 11,
+      "model_class_name": "KitKat",
+      "db_product_name": "KitKat",
+      "db_product_id": 24,
+      "display_name": "KitKat",
+      "category": "item",
+      "aliases": ["kitkat", "kit kat", "chocolate bar"]
+    },
+    "12": {
+      "yolo_class_id": 12,
+      "model_class_name": "Mobile",
+      "db_product_name": "Mobile Phone",
+      "db_product_id": 11,
+      "display_name": "Cell Phone",
+      "category": "item",
+      "aliases": ["mobile", "cell phone", "cellphone", "mobile phone", "phone", "smartphone"]
+    },
+    "13": {
+      "yolo_class_id": 13,
+      "model_class_name": "Chair",
+      "db_product_name": "Chair",
+      "db_product_id": null,
+      "display_name": "Chair (Excluded)",
+      "category": "furniture",
+      "aliases": ["chair", "office chair"]
+    },
+    "14": {
+      "yolo_class_id": 14,
+      "model_class_name": "Table",
+      "db_product_name": "Table",
+      "db_product_id": null,
+      "display_name": "Table (Excluded)",
+      "category": "furniture",
+      "aliases": ["table", "desk"]
+    },
+    "15": {
+      "yolo_class_id": 15,
+      "model_class_name": "Book",
+      "db_product_name": "Book",
+      "db_product_id": 12,
+      "display_name": "Book",
+      "category": "item",
+      "aliases": ["book", "notebook", "textbook"]
+    },
+    "16": {
+      "yolo_class_id": 16,
+      "model_class_name": "Pen",
+      "db_product_name": "Pen",
+      "db_product_id": 13,
+      "display_name": "Pen",
+      "category": "item",
+      "aliases": ["pen", "ballpoint pen", "marker"]
+    },
+    "17": {
+      "yolo_class_id": 17,
+      "model_class_name": "ID Card",
+      "db_product_name": "ID Card",
+      "db_product_id": null,
+      "display_name": "ID Card",
+      "category": "item",
+      "aliases": ["id card", "badge", "identity card"]
+    }
+  },
+  "coco_mappings": {
+    "0": {
+      "coco_id": 0,
+      "coco_name": "person",
+      "canonical_name": "Person",
+      "db_product_name": null,
+      "category": "person"
+    },
+    "67": {
+      "coco_id": 67,
+      "coco_name": "cell phone",
+      "canonical_name": "Mobile",
+      "db_product_name": "Mobile Phone",
+      "db_product_id": 11,
+      "display_name": "Cell Phone",
+      "category": "item"
+    },
+    "39": {
+      "coco_id": 39,
+      "coco_name": "bottle",
+      "canonical_name": "Water Bottle",
+      "db_product_name": "Water Bottle",
+      "db_product_id": 25,
+      "display_name": "Water Bottle",
+      "category": "item"
+    },
+    "73": {
+      "coco_id": 73,
+      "coco_name": "book",
+      "canonical_name": "Book",
+      "db_product_name": "Book",
+      "db_product_id": 12,
+      "display_name": "Book",
+      "category": "item"
+    }
+  },
+  "excluded_classes": [
+    "chair",
+    "table",
+    "dining table",
+    "desk",
+    "office chair",
+    "tie",
+    "necktie",
+    "suit tie"
+  ]
+}

@@ -1,12 +1,11 @@
-# Dataset configuration for YOLO11 Smart Shelf
-path: ./dataset
+# Canonical Dataset configuration for YOLO11 Smart Shelf
+path: D:/major proj2/ml/datasets/merged
 train: images/train
-val: images/train
+val: images/val
+test: images/test
 
-# Number of product classes
-nc: 13
+nc: 18
 
-# Class labels
 names:
   0: Apple
   1: Banana
@@ -15,9 +14,14 @@ names:
   4: Bread
   5: Lays
   6: Biscuits
-  7: Mobile
-  8: Chair
-  9: Table
-  10: Book
-  11: Pen
-  12: ID Card
+  7: Coca Cola
+  8: Pepsi
+  9: Sprite
+  10: Oreo
+  11: KitKat
+  12: Mobile
+  13: Chair
+  14: Table
+  15: Book
+  16: Pen
+  17: ID Card

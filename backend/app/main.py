@@ -1,6 +1,9 @@
 import os
 import sys
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+ROOT_DIR = os.path.abspath(os.path.join(BACKEND_DIR, ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
@@ -222,8 +225,198 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers=headers,
     )
 
+# ── 404 Handler for Frontend Routes on Port 8000 ─────────────────────────────
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import FileResponse
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        accept = request.headers.get("accept", "")
+        path = request.url.path
+        # If a browser requests an HTML page on port 8000 that isn't an API endpoint
+        if "text/html" in accept and not path.startswith("/api/"):
+            target_url = f"http://localhost:3000{path}"
+            return HTMLResponse(
+                status_code=404,
+                content=f"""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>SmartShelf Vision AI - Frontend Redirect</title>
+                    <meta http-equiv="refresh" content="3;url={target_url}">
+                    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+                    <style>
+                        body {{
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                            background-color: #0b0f19;
+                            color: #f1f5f9;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            margin: 0;
+                        }}
+                        .card {{
+                            background: rgba(30, 41, 59, 0.8);
+                            backdrop-filter: blur(16px);
+                            border: 1px solid rgba(255, 255, 255, 0.1);
+                            border-radius: 16px;
+                            padding: 36px;
+                            max-width: 520px;
+                            text-align: center;
+                            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+                        }}
+                        h1 {{ margin-top: 0; color: #38bdf8; font-size: 22px; }}
+                        p {{ color: #94a3b8; line-height: 1.6; font-size: 14px; }}
+                        code {{ background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; }}
+                        .btn-group {{ margin-top: 24px; display: flex; gap: 12px; justify-content: center; }}
+                        .btn {{
+                            padding: 10px 18px;
+                            border-radius: 8px;
+                            text-decoration: none;
+                            font-weight: 600;
+                            font-size: 14px;
+                            transition: all 0.2s ease;
+                        }}
+                        .btn-primary {{ background: #3b82f6; color: #ffffff; }}
+                        .btn-primary:hover {{ background: #2563eb; }}
+                        .btn-secondary {{ background: #334155; color: #e2e8f0; }}
+                        .btn-secondary:hover {{ background: #475569; }}
+                        .hint {{ font-size: 12px; color: #64748b; margin-top: 16px; }}
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h1>🧭 Frontend Route Requested</h1>
+                        <p>You requested <code>{path}</code> on <strong>Port 8000 (FastAPI Backend)</strong>.</p>
+                        <p>The interactive dashboard runs on <strong>Port 3000 (React Frontend)</strong>.</p>
+                        <p>Redirecting to React app in 3 seconds...</p>
+                        <div class="btn-group">
+                            <a class="btn btn-primary" href="{target_url}">Open on Port 3000</a>
+                            <a class="btn btn-secondary" href="/docs">API Docs (Swagger)</a>
+                        </div>
+                        <p class="hint">Ensure React dev server is running with <code>cd frontend && npm start</code>.</p>
+                    </div>
+                </body>
+                </html>
+                """
+            )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 # ── API Routes ────────────────────────────────────────────────────────────────
 app.include_router(router, prefix="/api")
+
+
+# ── Root & Favicon Endpoints ──────────────────────────────────────────────────
+from fastapi.responses import HTMLResponse, Response
+
+FAVICON_PATH = os.path.join(ROOT_DIR, "frontend", "public", "favicon.ico")
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📦</text></svg>"""
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root():
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>SmartShelf Vision AI - API Gateway</title>
+        <link rel="icon" href="/favicon.ico">
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background-color: #0b0f19;
+                color: #f1f5f9;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+            }}
+            .card {{
+                background: rgba(30, 41, 59, 0.7);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 16px;
+                padding: 40px;
+                max-width: 560px;
+                text-align: center;
+                box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            }}
+            .badge {{
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.3);
+                padding: 4px 12px;
+                border-radius: 9999px;
+                font-size: 12px;
+                font-weight: 600;
+                margin-bottom: 16px;
+            }}
+            .dot {{
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #10b981;
+                box-shadow: 0 0 8px #10b981;
+            }}
+            h1 {{ margin: 0 0 10px 0; color: #38bdf8; font-size: 24px; }}
+            p {{ color: #94a3b8; line-height: 1.6; font-size: 14px; }}
+            .btn-group {{ margin-top: 25px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }}
+            .btn {{
+                padding: 12px 20px;
+                border-radius: 8px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 14px;
+                transition: all 0.2s ease;
+            }}
+            .btn-primary {{ background: #3b82f6; color: #ffffff; }}
+            .btn-primary:hover {{ background: #2563eb; transform: translateY(-1px); }}
+            .btn-secondary {{ background: #334155; color: #e2e8f0; }}
+            .btn-secondary:hover {{ background: #475569; transform: translateY(-1px); }}
+            .info-box {{
+                margin-top: 25px;
+                background: rgba(15, 23, 42, 0.6);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                border-radius: 8px;
+                padding: 14px;
+                font-size: 13px;
+                color: #64748b;
+                text-align: left;
+            }}
+            .info-box span {{ color: #cbd5e1; font-family: monospace; }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="badge"><span class="dot"></span> Backend API Active • {settings.APP_VERSION}</div>
+            <h1>🚀 SmartShelf Vision AI API</h1>
+            <p>The FastAPI backend server is running and ready to handle AI detection, tracking telemetry, and inventory requests.</p>
+            <div class="btn-group">
+                <a class="btn btn-primary" href="http://localhost:3000">Open React Dashboard (Port 3000)</a>
+                <a class="btn btn-secondary" href="/docs">Swagger API Docs</a>
+            </div>
+            <div class="info-box">
+                <div>• REST API Base: <span>/api/...</span></div>
+                <div>• Live Camera WebSocket: <span>/ws</span></div>
+                <div>• Frontend Web App: <span>http://localhost:3000</span></div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    if os.path.exists(FAVICON_PATH):
+        return FileResponse(FAVICON_PATH, media_type="image/x-icon")
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 # ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -238,4 +431,4 @@ async def websocket_endpoint(websocket: WebSocket):
     except (WebSocketDisconnect, Exception):
         pass
     finally:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket)

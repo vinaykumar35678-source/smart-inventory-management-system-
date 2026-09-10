@@ -1,8 +1,9 @@
 {
-  "active_model_id": "yolo11_smartshelf_v2",
+  "model_id": "yolo11_smartshelf_v2",
   "model_name": "YOLO11s \u2014 SmartShelf Retail V2 (18 Classes)",
-  "model_path": "d:\\major proj2\\ml\\models\\yolo11_smartshelf_v2\\best.pt",
-  "is_custom": true,
+  "version": "v2.0_custom",
+  "base_model": "yolo11s.pt",
+  "dataset": "merged_retail_inventory",
   "classes": {
     "0": "Apple",
     "1": "Banana",
@@ -23,5 +24,16 @@
     "16": "Pen",
     "17": "ID Card"
   },
-  "activated_at": "2026-09-09T20:47:00"
+  "num_classes": 18,
+  "epochs": 25,
+  "batch_size": 8,
+  "image_size": 640,
+  "precision": 0.942,
+  "recall": 0.915,
+  "map50": 0.958,
+  "map50_95": 0.884,
+  "inference_speed_ms": 22.4,
+  "fps": 44.6,
+  "model_path": "d:\\major proj2\\ml\\models\\yolo11_smartshelf_v2\\best.pt",
+  "status": "READY"
 }

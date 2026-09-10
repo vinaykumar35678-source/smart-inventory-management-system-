@@ -8,13 +8,22 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional, Tuple
 
-from app.config import settings
-from app.database import SessionLocal
-from app.models import NotificationLog, Product, User, Shelf
-from app.notifications.email_templates import (
-    render_stock_alert_email,
-    render_test_email,
-)
+try:
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.models import NotificationLog, Product, User, Shelf
+    from app.notifications.email_templates import (
+        render_stock_alert_email,
+        render_test_email,
+    )
+except ImportError:
+    from ..config import settings
+    from ..database import SessionLocal
+    from ..models import NotificationLog, Product, User, Shelf
+    from .email_templates import (
+        render_stock_alert_email,
+        render_test_email,
+    )
 
 logger = logging.getLogger("smartshelf.notifications")
 

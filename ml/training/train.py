@@ -206,6 +206,7 @@ def run_custom_training(
             imgsz=image_size,
             patience=patience,
             device=device,
+            workers=2,
             project=os.path.join(WORKSPACE_ROOT, "runs", "train"),
             name=model_name,
             exist_ok=True,
@@ -238,17 +239,27 @@ def run_custom_training(
         poor_classes = []
         if hasattr(val_results, "box"):
             try:
+                ap_class_index = getattr(val_results.box, "ap_class_index", None)
                 for idx, cname in class_names_map.items():
-                    c_p = float(val_results.box.p[idx]) if idx < len(val_results.box.p) else precision
-                    c_r = float(val_results.box.r[idx]) if idx < len(val_results.box.r) else recall
-                    c_map50 = float(val_results.box.ap50[idx]) if idx < len(val_results.box.ap50) else map50
-                    class_metrics[cname] = {
-                        "precision": round(c_p, 3),
-                        "recall": round(c_r, 3),
-                        "map50": round(c_map50, 3)
-                    }
-                    if c_map50 < 0.40:
-                        poor_classes.append(cname)
+                    c_p, c_r, c_map50 = None, None, None
+                    if ap_class_index is not None and idx in ap_class_index:
+                        pos = list(ap_class_index).index(idx)
+                        c_p = float(val_results.box.p[pos])
+                        c_r = float(val_results.box.r[pos])
+                        c_map50 = float(val_results.box.ap50[pos])
+                    elif idx < len(val_results.box.p) and ap_class_index is None:
+                        c_p = float(val_results.box.p[idx])
+                        c_r = float(val_results.box.r[idx])
+                        c_map50 = float(val_results.box.ap50[idx])
+
+                    if c_p is not None:
+                        class_metrics[cname] = {
+                            "precision": round(c_p, 3),
+                            "recall": round(c_r, 3),
+                            "map50": round(c_map50, 3)
+                        }
+                        if c_map50 < 0.40:
+                            poor_classes.append(cname)
             except Exception as metric_err:
                 print(f"[Train] Note reading class-wise metrics: {metric_err}")
 
